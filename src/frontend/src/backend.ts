@@ -822,6 +822,34 @@ export class Backend implements backendInterface {
             return result;
         }
     }
+    async toggleCategoryHidden(arg0: string, arg1: boolean): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.toggleCategoryHidden(arg0, arg1);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.toggleCategoryHidden(arg0, arg1);
+            return result;
+        }
+    }
+    async getHiddenCategoryIds(): Promise<Array<string>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getHiddenCategoryIds();
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getHiddenCategoryIds();
+            return result;
+        }
+    }
 }
 function from_candid_Comment_n21(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _Comment): Comment {
     return from_candid_record_n22(_uploadFile, _downloadFile, value);

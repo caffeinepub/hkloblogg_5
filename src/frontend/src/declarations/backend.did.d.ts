@@ -99,6 +99,8 @@ export interface _SERVICE {
   'createComment' : ActorMethod<[string, string, [] | [string]], undefined>,
   'createPost' : ActorMethod<[string, string, string], undefined>,
   'deleteCategory' : ActorMethod<[string], undefined>,
+  'getHiddenCategoryIds' : ActorMethod<[], Array<string>>,
+  'toggleCategoryHidden' : ActorMethod<[string, boolean], undefined>,
   'deleteComment' : ActorMethod<[string], undefined>,
   'deleteMedia' : ActorMethod<[bigint], undefined>,
   'deleteMyAccount' : ActorMethod<[], undefined>,
