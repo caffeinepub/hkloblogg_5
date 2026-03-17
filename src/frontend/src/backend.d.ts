@@ -107,4 +107,14 @@ export interface backendInterface {
     setRole(user: Principal, role: UserRole): Promise<void>;
     unblockUser(user: Principal): Promise<void>;
     uploadMedia(postId: bigint | null, commentId: bigint | null, fileType: string, fileName: string, fileSize: bigint, blobKey: string): Promise<bigint>;
+    followUser(userToFollow: Principal): Promise<void>;
+    unfollowUser(userToUnfollow: Principal): Promise<void>;
+    followPost(postId: string): Promise<void>;
+    unfollowPost(postId: string): Promise<void>;
+    getFollowedUsers(): Promise<Array<Principal>>;
+    getFollowedUsersPosts(): Promise<Array<Post>>;
+    getFollowedPosts(): Promise<Array<string>>;
+    isFollowingUser(userToCheck: Principal): Promise<boolean>;
+    isFollowingPost(postId: string): Promise<boolean>;
+    getPostFollowerCount(postId: string): Promise<bigint>;
 }

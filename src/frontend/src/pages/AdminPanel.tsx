@@ -40,7 +40,9 @@ import {
   Shield,
   Tag,
   Trash2,
+  UserPlus,
   Users,
+  X,
 } from "lucide-react";
 import { motion } from "motion/react";
 import { useState } from "react";
@@ -57,17 +59,20 @@ import type { Comment as CommentType } from "../backend.d";
 import AuthorName from "../components/AuthorName";
 import { useActor } from "../hooks/useActor";
 import {
+  useAddUserToCategoryAllowedList,
   useBlockUser,
   useCreateCategory,
   useDeleteCategory,
   useDeleteComment,
   useDeletePost,
   useDeleteUser,
+  useGetCategoryAllowedUsers,
   useGetHiddenCategoryIds,
   useListCategories,
   useListPosts,
   useListUsersWithPrincipal,
   usePinPost,
+  useRemoveUserFromCategoryAllowedList,
   useSetRole,
   useToggleCategoryHidden,
   useUnblockUser,
@@ -175,13 +180,65 @@ function CategoryRow({
   category,
   isHidden,
   index,
+  users,
 }: {
   category: Category;
   isHidden: boolean;
   index: number;
+  users: UserWithPrincipal[];
 }) {
   const deleteCategory = useDeleteCategory();
   const toggleHidden = useToggleCategoryHidden();
+  const [showWhitelist, setShowWhitelist] = useState(false);
+  const [userSearchQuery, setUserSearchQuery] = useState("");
+  const { data: allowedPrincipals } = useGetCategoryAllowedUsers(
+    isHidden ? category.id : null,
+  );
+  const addToWhitelist = useAddUserToCategoryAllowedList();
+  const removeFromWhitelist = useRemoveUserFromCategoryAllowedList();
+
+  const allowedUsers = (allowedPrincipals ?? [])
+    .map((p) => users.find((u) => u.principal.toString() === p.toString()))
+    .filter(Boolean) as UserWithPrincipal[];
+
+  const allowedPrincipalStrs = new Set(
+    (allowedPrincipals ?? []).map((p) => p.toString()),
+  );
+  const availableToAdd = users.filter(
+    (u) => !allowedPrincipalStrs.has(u.principal.toString()),
+  );
+  const filteredAvailable = availableToAdd.filter((u) =>
+    u.profile.alias.toLowerCase().includes(userSearchQuery.toLowerCase()),
+  );
+
+  const handleAddToWhitelist = async (user: UserWithPrincipal) => {
+    try {
+      await addToWhitelist.mutateAsync({
+        categoryId: category.id,
+        user: user.principal,
+      });
+      setUserSearchQuery("");
+      toast.success(
+        `${user.profile.alias} har fått åtkomst till "${category.name}".`,
+      );
+    } catch {
+      toast.error("Kunde inte lägga till användaren.");
+    }
+  };
+
+  const handleRemoveFromWhitelist = async (user: UserWithPrincipal) => {
+    try {
+      await removeFromWhitelist.mutateAsync({
+        categoryId: category.id,
+        user: user.principal,
+      });
+      toast.success(
+        `${user.profile.alias} har tagits bort från "${category.name}".`,
+      );
+    } catch {
+      toast.error("Kunde inte ta bort användaren.");
+    }
+  };
 
   const handleDelete = async () => {
     try {
@@ -209,86 +266,168 @@ function CategoryRow({
   };
 
   return (
-    <TableRow
-      data-ocid={`admin.categories.item.${index}`}
-      className={isHidden ? "opacity-60" : ""}
-    >
-      <TableCell className="font-medium">
-        <div className="flex items-center gap-2">
-          {category.name}
-          {isHidden && (
-            <Badge variant="secondary" className="text-xs gap-1">
-              <EyeOff className="h-2.5 w-2.5" />
-              Dold
-            </Badge>
-          )}
-        </div>
-      </TableCell>
-      <TableCell className="text-muted-foreground text-sm">
-        {new Date(Number(category.createdAt) / 1_000_000).toLocaleDateString(
-          "sv-SE",
-        )}
-      </TableCell>
-      <TableCell className="text-right">
-        <div className="flex items-center justify-end gap-1">
-          <Button
-            data-ocid={`admin.categories.toggle.${index}`}
-            variant="ghost"
-            size="sm"
-            onClick={handleToggleHidden}
-            disabled={toggleHidden.isPending}
-            title={isHidden ? "Visa kategori" : "Dölj kategori"}
-            className="text-muted-foreground hover:text-foreground"
-          >
-            {toggleHidden.isPending ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : isHidden ? (
-              <Eye className="h-4 w-4" />
-            ) : (
-              <EyeOff className="h-4 w-4" />
+    <>
+      <TableRow
+        data-ocid={`admin.categories.item.${index}`}
+        className={isHidden ? "opacity-60" : ""}
+      >
+        <TableCell className="font-medium">
+          <div className="flex items-center gap-2">
+            {category.name}
+            {isHidden && (
+              <Badge variant="secondary" className="text-xs gap-1">
+                <EyeOff className="h-2.5 w-2.5" />
+                Dold
+              </Badge>
             )}
-          </Button>
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
+          </div>
+        </TableCell>
+        <TableCell className="text-muted-foreground text-sm">
+          {new Date(Number(category.createdAt) / 1_000_000).toLocaleDateString(
+            "sv-SE",
+          )}
+        </TableCell>
+        <TableCell className="text-right">
+          <div className="flex items-center justify-end gap-1">
+            <Button
+              data-ocid={`admin.categories.toggle.${index}`}
+              variant="ghost"
+              size="sm"
+              onClick={handleToggleHidden}
+              disabled={toggleHidden.isPending}
+              title={isHidden ? "Visa kategori" : "Dölj kategori"}
+              className="text-muted-foreground hover:text-foreground"
+            >
+              {toggleHidden.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : isHidden ? (
+                <Eye className="h-4 w-4" />
+              ) : (
+                <EyeOff className="h-4 w-4" />
+              )}
+            </Button>
+            {isHidden && (
               <Button
-                data-ocid={`admin.categories.delete_button.${index}`}
-                variant="ghost"
+                data-ocid={`admin.categories.whitelist.${index}`}
+                variant={showWhitelist ? "secondary" : "ghost"}
                 size="sm"
-                className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                disabled={deleteCategory.isPending}
+                onClick={() => setShowWhitelist((v) => !v)}
+                title="Hantera åtkomst"
+                className="text-muted-foreground hover:text-foreground"
               >
-                {deleteCategory.isPending ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Trash2 className="h-4 w-4" />
-                )}
+                <UserPlus className="h-4 w-4" />
               </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent data-ocid="admin.categories.dialog">
-              <AlertDialogHeader>
-                <AlertDialogTitle>Radera kategori</AlertDialogTitle>
-                <AlertDialogDescription>
-                  Är du säker på att du vill radera kategorin &ldquo;
-                  {category.name}&rdquo;? Detta kan inte ångras.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel data-ocid="admin.categories.cancel_button">
-                  Avbryt
-                </AlertDialogCancel>
-                <AlertDialogAction
-                  data-ocid="admin.categories.confirm_button"
-                  onClick={handleDelete}
-                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            )}
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  data-ocid={`admin.categories.delete_button.${index}`}
+                  variant="ghost"
+                  size="sm"
+                  className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                  disabled={deleteCategory.isPending}
                 >
-                  Radera
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        </div>
-      </TableCell>
-    </TableRow>
+                  {deleteCategory.isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="h-4 w-4" />
+                  )}
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent data-ocid="admin.categories.dialog">
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Radera kategori</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Är du säker på att du vill radera kategorin &ldquo;
+                    {category.name}&rdquo;? Detta kan inte ångras.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel data-ocid="admin.categories.cancel_button">
+                    Avbryt
+                  </AlertDialogCancel>
+                  <AlertDialogAction
+                    data-ocid="admin.categories.confirm_button"
+                    onClick={handleDelete}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  >
+                    Radera
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
+        </TableCell>
+      </TableRow>
+      {showWhitelist && isHidden && (
+        <TableRow data-ocid={`admin.categories.whitelist_panel.${index}`}>
+          <TableCell colSpan={3} className="py-3 px-6 bg-muted/30">
+            <div className="space-y-3">
+              <p className="text-xs font-medium text-foreground">
+                Åtkomst till &ldquo;{category.name}&rdquo;
+              </p>
+              {allowedUsers.length === 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  Inga användare har åtkomst till denna dolda kategori.
+                </p>
+              ) : (
+                <div className="flex flex-wrap gap-1.5">
+                  {allowedUsers.map((u) => (
+                    <div
+                      key={u.principal.toString()}
+                      className="flex items-center gap-1 bg-background border border-border rounded-md px-2 py-0.5 text-xs"
+                    >
+                      <span>{u.profile.alias}</span>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveFromWhitelist(u)}
+                        disabled={removeFromWhitelist.isPending}
+                        className="text-muted-foreground hover:text-destructive transition-colors ml-0.5"
+                        title="Ta bort åtkomst"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="flex gap-2">
+                <div className="relative flex-1 max-w-xs">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground" />
+                  <Input
+                    value={userSearchQuery}
+                    onChange={(e) => setUserSearchQuery(e.target.value)}
+                    placeholder="Sök alias för att lägga till…"
+                    className="pl-7 h-7 text-xs"
+                  />
+                </div>
+              </div>
+              {userSearchQuery && filteredAvailable.length > 0 && (
+                <div className="bg-background border border-border rounded-md shadow-sm max-h-32 overflow-y-auto">
+                  {filteredAvailable.slice(0, 8).map((u) => (
+                    <button
+                      type="button"
+                      key={u.principal.toString()}
+                      onClick={() => handleAddToWhitelist(u)}
+                      disabled={addToWhitelist.isPending}
+                      className="w-full text-left px-3 py-1.5 text-xs hover:bg-muted transition-colors flex items-center gap-2"
+                    >
+                      <UserPlus className="h-3 w-3 text-muted-foreground" />
+                      {u.profile.alias}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {userSearchQuery && filteredAvailable.length === 0 && (
+                <p className="text-xs text-muted-foreground">
+                  Ingen användare matchar sökningen.
+                </p>
+              )}
+            </div>
+          </TableCell>
+        </TableRow>
+      )}
+    </>
   );
 }
 
@@ -812,6 +951,7 @@ export default function AdminPanel({ onBack }: AdminPanelProps) {
                           category={cat}
                           isHidden={hiddenIdsSet.has(cat.id)}
                           index={i + 1}
+                          users={users ?? []}
                         />
                       ))}
                     </TableBody>

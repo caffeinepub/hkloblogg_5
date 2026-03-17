@@ -202,6 +202,16 @@ export interface backendInterface {
     setRole(user: Principal, role: UserRole): Promise<void>;
     unblockUser(user: Principal): Promise<void>;
     uploadMedia(postId: bigint | null, commentId: bigint | null, fileType: string, fileName: string, fileSize: bigint, blobKey: string): Promise<bigint>;
+    followUser(userToFollow: Principal): Promise<void>;
+    unfollowUser(userToUnfollow: Principal): Promise<void>;
+    followPost(postId: string): Promise<void>;
+    unfollowPost(postId: string): Promise<void>;
+    getFollowedUsers(): Promise<Array<Principal>>;
+    getFollowedUsersPosts(): Promise<Array<Post>>;
+    getFollowedPosts(): Promise<Array<string>>;
+    isFollowingUser(userToCheck: Principal): Promise<boolean>;
+    isFollowingPost(postId: string): Promise<boolean>;
+    getPostFollowerCount(postId: string): Promise<bigint>;
 }
 import type { Comment as _Comment, MediaFile as _MediaFile, Post as _Post, SearchResult as _SearchResult, Time as _Time, UserProfile as _UserProfile, UserRole as _UserRole, UserWithPrincipal as _UserWithPrincipal, _CaffeineStorageRefillInformation as __CaffeineStorageRefillInformation, _CaffeineStorageRefillResult as __CaffeineStorageRefillResult } from "./declarations/backend.did.d.ts";
 export class Backend implements backendInterface {
@@ -847,6 +857,146 @@ export class Backend implements backendInterface {
             }
         } else {
             const result = await this.actor.getHiddenCategoryIds();
+            return result;
+        }
+    }
+    async followUser(arg0: Principal): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.followUser(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error('unreachable');
+            }
+        } else {
+            const result = await this.actor.followUser(arg0);
+            return result;
+        }
+    }
+    async unfollowUser(arg0: Principal): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.unfollowUser(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error('unreachable');
+            }
+        } else {
+            const result = await this.actor.unfollowUser(arg0);
+            return result;
+        }
+    }
+    async followPost(arg0: string): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.followPost(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error('unreachable');
+            }
+        } else {
+            const result = await this.actor.followPost(arg0);
+            return result;
+        }
+    }
+    async unfollowPost(arg0: string): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.unfollowPost(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error('unreachable');
+            }
+        } else {
+            const result = await this.actor.unfollowPost(arg0);
+            return result;
+        }
+    }
+    async getFollowedUsers(): Promise<Array<Principal>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getFollowedUsers();
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error('unreachable');
+            }
+        } else {
+            const result = await this.actor.getFollowedUsers();
+            return result;
+        }
+    }
+    async getFollowedUsersPosts(): Promise<Array<Post>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getFollowedUsersPosts();
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error('unreachable');
+            }
+        } else {
+            const result = await this.actor.getFollowedUsersPosts();
+            return result;
+        }
+    }
+    async getFollowedPosts(): Promise<Array<string>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getFollowedPosts();
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error('unreachable');
+            }
+        } else {
+            const result = await this.actor.getFollowedPosts();
+            return result;
+        }
+    }
+    async isFollowingUser(arg0: Principal): Promise<boolean> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.isFollowingUser(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error('unreachable');
+            }
+        } else {
+            const result = await this.actor.isFollowingUser(arg0);
+            return result;
+        }
+    }
+    async isFollowingPost(arg0: string): Promise<boolean> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.isFollowingPost(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error('unreachable');
+            }
+        } else {
+            const result = await this.actor.isFollowingPost(arg0);
+            return result;
+        }
+    }
+    async getPostFollowerCount(arg0: string): Promise<bigint> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getPostFollowerCount(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error('unreachable');
+            }
+        } else {
+            const result = await this.actor.getPostFollowerCount(arg0);
             return result;
         }
     }

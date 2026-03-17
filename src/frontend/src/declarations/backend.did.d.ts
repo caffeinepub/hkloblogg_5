@@ -138,6 +138,16 @@ export interface _SERVICE {
     [[] | [bigint], [] | [bigint], string, string, bigint, string],
     bigint
   >,
+  'followUser' : ActorMethod<[Principal], undefined>,
+  'unfollowUser' : ActorMethod<[Principal], undefined>,
+  'followPost' : ActorMethod<[string], undefined>,
+  'unfollowPost' : ActorMethod<[string], undefined>,
+  'getFollowedUsers' : ActorMethod<[], Array<Principal>>,
+  'getFollowedUsersPosts' : ActorMethod<[], Array<Post>>,
+  'getFollowedPosts' : ActorMethod<[], Array<string>>,
+  'isFollowingUser' : ActorMethod<[Principal], boolean>,
+  'isFollowingPost' : ActorMethod<[string], boolean>,
+  'getPostFollowerCount' : ActorMethod<[string], bigint>,
 }
 export declare const idlService: IDL.ServiceClass;
 export declare const idlInitArgs: IDL.Type[];

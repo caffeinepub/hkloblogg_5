@@ -159,6 +159,16 @@ export const idlService = IDL.Service({
       [IDL.Nat],
       [],
     ),
+  'followUser' : IDL.Func([IDL.Principal], [], []),
+  'unfollowUser' : IDL.Func([IDL.Principal], [], []),
+  'followPost' : IDL.Func([IDL.Text], [], []),
+  'unfollowPost' : IDL.Func([IDL.Text], [], []),
+  'getFollowedUsers' : IDL.Func([], [IDL.Vec(IDL.Principal)], ['query']),
+  'getFollowedUsersPosts' : IDL.Func([], [IDL.Vec(Post)], ['query']),
+  'getFollowedPosts' : IDL.Func([], [IDL.Vec(IDL.Text)], ['query']),
+  'isFollowingUser' : IDL.Func([IDL.Principal], [IDL.Bool], ['query']),
+  'isFollowingPost' : IDL.Func([IDL.Text], [IDL.Bool], ['query']),
+  'getPostFollowerCount' : IDL.Func([IDL.Text], [IDL.Nat], ['query']),
 });
 
 export const idlInitArgs = [];

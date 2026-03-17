@@ -493,3 +493,56 @@ export function useSetRole() {
     },
   });
 }
+
+export function useGetCategoryAllowedUsers(categoryId: string | null) {
+  const { actor, isFetching } = useActor();
+  return useQuery<Principal[]>({
+    queryKey: ["categoryAllowedUsers", categoryId],
+    queryFn: async () => {
+      if (!actor || !categoryId) return [];
+      return fullActor(actor).getCategoryAllowedUsers(categoryId);
+    },
+    enabled: !!actor && !isFetching && !!categoryId,
+  });
+}
+
+export function useAddUserToCategoryAllowedList() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      categoryId,
+      user,
+    }: { categoryId: string; user: Principal }) => {
+      if (!actor) throw new Error("Inte inloggad");
+      return fullActor(actor).addUserToCategoryAllowedList(categoryId, user);
+    },
+    onSuccess: (_data, { categoryId }) => {
+      queryClient.invalidateQueries({
+        queryKey: ["categoryAllowedUsers", categoryId],
+      });
+    },
+  });
+}
+
+export function useRemoveUserFromCategoryAllowedList() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      categoryId,
+      user,
+    }: { categoryId: string; user: Principal }) => {
+      if (!actor) throw new Error("Inte inloggad");
+      return fullActor(actor).removeUserFromCategoryAllowedList(
+        categoryId,
+        user,
+      );
+    },
+    onSuccess: (_data, { categoryId }) => {
+      queryClient.invalidateQueries({
+        queryKey: ["categoryAllowedUsers", categoryId],
+      });
+    },
+  });
+}

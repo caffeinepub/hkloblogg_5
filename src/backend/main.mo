@@ -89,6 +89,10 @@ actor {
   var mediaFiles = Map.empty<Nat, MediaFile>();
   var nextMediaId = 1;
 
+  // Follow state
+  var userFollows = Map.empty<Principal, List.List<Principal>>();  // caller -> list of followed users
+  var postFollows = Map.empty<Text, List.List<Principal>>();       // postId -> list of followers
+
   func requireActiveUser(caller : Principal) : UserProfile {
     switch (userProfiles.get(caller)) {
       case (null) { Runtime.trap("Unauthorized: Must be registered") };
@@ -110,6 +114,7 @@ actor {
     for (postId in userPostIds.toArray().vals()) {
       posts.remove(postId);
       postLikes.remove(postId);
+      postFollows.remove(postId);
       let postCommentIds = List.empty<Text>();
       for ((cid, c) in comments.entries()) {
         if (c.postId == postId) {
@@ -157,6 +162,19 @@ actor {
     for ((catId, allowedList) in categoryAllowedUsers.entries()) {
       let filtered = allowedList.filter(func(p) { p != user });
       categoryAllowedUsers.add(catId, filtered);
+    };
+
+    // Remove user from follow state
+    userFollows.remove(user);
+    // Remove user from all other users' follow lists
+    for ((follower, followedList) in userFollows.entries()) {
+      let filtered = followedList.filter(func(p) { p != user });
+      userFollows.add(follower, filtered);
+    };
+    // Remove user from all post follow lists
+    for ((pid, followerList) in postFollows.entries()) {
+      let filtered = followerList.filter(func(p) { p != user });
+      postFollows.add(pid, filtered);
     };
   };
 
@@ -476,6 +494,7 @@ actor {
         };
         posts.remove(postId);
         postLikes.remove(postId);
+        postFollows.remove(postId);
         let toDelete = List.empty<Text>();
         for ((cid, c) in comments.entries()) {
           if (c.postId == postId) { toDelete.add(cid) };
@@ -775,5 +794,134 @@ actor {
       Runtime.trap("Unauthorized: Only admin can access all media");
     };
     mediaFiles.values().toArray();
+  };
+
+  // ====== FOLLOW FUNCTIONS ======
+
+  public shared ({ caller }) func followUser(userToFollow : Principal) : async () {
+    let _ = requireActiveUser(caller);
+
+    if (caller == userToFollow) {
+      Runtime.trap("Cannot follow yourself");
+    };
+
+    if (not userProfiles.containsKey(userToFollow)) {
+      Runtime.trap("User not found");
+    };
+
+    let existingFollows = switch (userFollows.get(caller)) {
+      case (null) { List.empty<Principal>() };
+      case (?list) { list };
+    };
+
+    let alreadyFollowing = existingFollows.any(func(p) { p == userToFollow });
+    if (not alreadyFollowing) {
+      existingFollows.add(userToFollow);
+      userFollows.add(caller, existingFollows);
+    };
+  };
+
+  public shared ({ caller }) func unfollowUser(userToUnfollow : Principal) : async () {
+    let _ = requireActiveUser(caller);
+
+    switch (userFollows.get(caller)) {
+      case (null) {};
+      case (?list) {
+        let filtered = list.filter(func(p) { p != userToUnfollow });
+        userFollows.add(caller, filtered);
+      };
+    };
+  };
+
+  public shared ({ caller }) func followPost(postId : Text) : async () {
+    let _ = requireActiveUser(caller);
+
+    if (not posts.containsKey(postId)) {
+      Runtime.trap("Post not found");
+    };
+
+    let existingFollowers = switch (postFollows.get(postId)) {
+      case (null) { List.empty<Principal>() };
+      case (?list) { list };
+    };
+
+    let alreadyFollowing = existingFollowers.any(func(p) { p == caller });
+    if (not alreadyFollowing) {
+      existingFollowers.add(caller);
+      postFollows.add(postId, existingFollowers);
+    };
+  };
+
+  public shared ({ caller }) func unfollowPost(postId : Text) : async () {
+    let _ = requireActiveUser(caller);
+
+    switch (postFollows.get(postId)) {
+      case (null) {};
+      case (?list) {
+        let filtered = list.filter(func(p) { p != caller });
+        postFollows.add(postId, filtered);
+      };
+    };
+  };
+
+  public query ({ caller }) func getFollowedUsers() : async [Principal] {
+    let _ = requireActiveUser(caller);
+
+    switch (userFollows.get(caller)) {
+      case (null) { [] };
+      case (?list) { list.toArray() };
+    };
+  };
+
+  public query ({ caller }) func getFollowedUsersPosts() : async [Post] {
+    let _ = requireActiveUser(caller);
+
+    let followed = switch (userFollows.get(caller)) {
+      case (null) { return [] };
+      case (?list) { list };
+    };
+
+    posts.values().toArray().filter(func(post) {
+      followed.any(func(p) { p == post.authorPrincipal })
+    });
+  };
+
+  public query ({ caller }) func getFollowedPosts() : async [Text] {
+    let _ = requireActiveUser(caller);
+
+    let result = List.empty<Text>();
+    for ((postId, followers) in postFollows.entries()) {
+      if (followers.any(func(p) { p == caller })) {
+        result.add(postId);
+      };
+    };
+    result.toArray();
+  };
+
+  public query ({ caller }) func isFollowingUser(userToCheck : Principal) : async Bool {
+    let _ = requireActiveUser(caller);
+
+    switch (userFollows.get(caller)) {
+      case (null) { false };
+      case (?list) { list.any(func(p) { p == userToCheck }) };
+    };
+  };
+
+  public query ({ caller }) func isFollowingPost(postId : Text) : async Bool {
+    let _ = requireActiveUser(caller);
+
+    switch (postFollows.get(postId)) {
+      case (null) { false };
+      case (?list) { list.any(func(p) { p == caller }) };
+    };
+  };
+
+  public query ({ caller }) func getPostFollowerCount(postId : Text) : async Nat {
+    let _ = requireActiveUser(caller);
+
+    switch (postFollows.get(postId)) {
+      case (null) { 0 };
+      case (?list) { list.size() };
+    };
   };
 };

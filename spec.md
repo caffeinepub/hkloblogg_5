@@ -1,25 +1,32 @@
 # HKLOblogg
 
 ## Current State
-Appen har en fullt fungerande bloggplattform med kategorier, inlägg, kommentarer, media-uppladdning, adminpanel och möjlighet att dölja kategorier via eye-ikonen. Dolda kategorier är osynliga för vanliga användare.
+Bloggen har kategorier, inlägg, kommentarer, likes, media-uppladdning, category hiding/whitelisting och användarsystem med Internet Identity. Backend är i Motoko.
 
 ## Requested Changes (Diff)
 
 ### Add
-- `categoryAllowedUsers` Map<Text, List<Principal>> i backend -- lagrar vitlistade användare per kategori-ID
-- `addUserToCategoryAllowedList(categoryId, userPrincipal)` -- superadmin kan lägga till en användare i en kategoris vitlista
-- `removeUserFromCategoryAllowedList(categoryId, userPrincipal)` -- superadmin kan ta bort en användare från vitlistan
-- `getCategoryAllowedUsers(categoryId)` -- superadmin kan hämta vilka användare som har åtkomst till en dold kategori
+- `userFollows` map: lagrar vilka användare en principal följer
+- `postFollows` map: lagrar vilka användare som följer ett visst inlägg
+- `followUser(user)` / `unfollowUser(user)` – följa/avfölja en användare
+- `followPost(postId)` / `unfollowPost(postId)` – följa/avfölja ett inlägg
+- `getFollowedUsers()` – returnerar lista med principals jag följer
+- `getFollowedUsersPosts()` – returnerar inlägg från användare jag följer
+- `getFollowedPosts()` – returnerar lista med post-IDs jag följer
+- `isFollowingUser(user)` – returnerar bool
+- `isFollowingPost(postId)` – returnerar bool
+- `getPostFollowerCount(postId)` – antal som följer ett inlägg
+- Rensa upp följ-relationer när en användare raderas (deleteUserContent)
 
 ### Modify
-- `listCategories`: Dolda kategorier visas för användare som finns i kategorins vitlista (samma som synliga kategorier)
+- `deleteUserContent` – ta bort user från userFollows och postFollows vid radering
 
 ### Remove
-- Inget tas bort
+- Inget
 
 ## Implementation Plan
-1. Lägg till `categoryAllowedUsers` Map i backend state
-2. Implementera `addUserToCategoryAllowedList`, `removeUserFromCategoryAllowedList`, `getCategoryAllowedUsers`
-3. Uppdatera `listCategories` för att inkludera dolda kategorier om caller finns i allowedUsers
-4. Uppdatera `backend.d.ts` med de nya metodsignaturerna
-5. Uppdatera `backend.did.d.ts` med de nya metoderna
+1. Lägg till `userFollows` och `postFollows` maps i state
+2. Implementera followUser/unfollowUser med validering
+3. Implementera followPost/unfollowPost med validering
+4. Implementera query-metoder: getFollowedUsers, getFollowedUsersPosts, getFollowedPosts, isFollowingUser, isFollowingPost, getPostFollowerCount
+5. Uppdatera deleteUserContent för att städa upp följ-data
