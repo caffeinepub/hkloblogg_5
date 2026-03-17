@@ -12,7 +12,6 @@ import LoginPage from "./pages/LoginPage";
 import PostForm from "./pages/PostForm";
 import PostView from "./pages/PostView";
 import ProfilePage from "./pages/ProfilePage";
-import RegisterPage from "./pages/RegisterPage";
 import SearchPage from "./pages/SearchPage";
 
 type View =
@@ -118,12 +117,13 @@ function AppShell() {
   }
 
   if (!identity) return <LoginPage />;
-  if (!profile) return <RegisterPage />;
+
+  const hasProfile = !!profile;
 
   if (view.name === "profile") {
     return (
       <ProfilePage
-        profile={profile}
+        profile={profile ?? null}
         onBack={() => setView({ name: "feed" })}
         onLogout={clear}
       />
@@ -185,6 +185,7 @@ function AppShell() {
 
   return (
     <FeedPage
+      hasProfile={hasProfile}
       onPost={(id) => setView({ name: "post", postId: id })}
       onCreatePost={() => setView({ name: "create-post" })}
       onAdminPanel={() => setView({ name: "admin" })}

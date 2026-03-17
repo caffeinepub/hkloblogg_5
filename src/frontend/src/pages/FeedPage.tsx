@@ -5,6 +5,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   BookOpen,
   Heart,
+  Info,
   LogOut,
   PenLine,
   Pin,
@@ -26,6 +27,7 @@ import {
 } from "../hooks/useQueries";
 
 interface FeedPageProps {
+  hasProfile?: boolean;
   onPost: (id: string) => void;
   onCreatePost: () => void;
   onAdminPanel: () => void;
@@ -104,13 +106,14 @@ function PostCard({
 }
 
 export default function FeedPage({
+  hasProfile = true,
   onPost,
   onCreatePost,
   onAdminPanel,
   onSearch,
   onProfile,
 }: FeedPageProps) {
-  const { clear } = useInternetIdentity();
+  const { identity, clear } = useInternetIdentity();
   const { data: profile } = useMyProfile();
   const { data: isAdmin } = useIsAdmin();
   const { data: categories } = useListCategories();
@@ -134,6 +137,8 @@ export default function FeedPage({
     const q = searchInput.trim();
     if (q) onSearch(q);
   };
+
+  const showProfileBanner = !!identity && !hasProfile;
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -175,6 +180,17 @@ export default function FeedPage({
                 <span>{profile.alias}</span>
               </button>
             )}
+            {!hasProfile && identity && (
+              <button
+                type="button"
+                data-ocid="feed.profile.button"
+                onClick={onProfile}
+                className="hidden sm:flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors px-2 py-1 rounded-md hover:bg-muted"
+              >
+                <User className="w-3.5 h-3.5" />
+                <span>Profil</span>
+              </button>
+            )}
             {isAdmin && (
               <Button
                 data-ocid="feed.admin_panel.button"
@@ -199,6 +215,36 @@ export default function FeedPage({
           </div>
         </div>
       </header>
+
+      {/* New user welcome banner */}
+      {showProfileBanner && (
+        <motion.div
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+          data-ocid="feed.profile_banner.panel"
+          className="bg-blue-50 border-b border-blue-200"
+        >
+          <div className="max-w-3xl mx-auto px-6 py-3 flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <Info className="w-4 h-4 text-blue-600 shrink-0" />
+              <p className="text-sm text-blue-800">
+                Välkommen! Ange ditt visningsnamn i din profil för att kunna
+                skriva inlägg och kommentarer.
+              </p>
+            </div>
+            <Button
+              data-ocid="feed.profile_banner.button"
+              size="sm"
+              variant="outline"
+              onClick={onProfile}
+              className="shrink-0 border-blue-300 text-blue-700 hover:bg-blue-100"
+            >
+              Gå till profilen
+            </Button>
+          </div>
+        </motion.div>
+      )}
 
       {/* Category filter */}
       <div className="border-b border-border bg-card/60 backdrop-blur-sm sticky top-[57px] z-10">
@@ -277,9 +323,19 @@ export default function FeedPage({
       <button
         type="button"
         data-ocid="feed.create_post.button"
-        onClick={onCreatePost}
-        className="fixed bottom-8 right-8 z-30 flex items-center gap-2 bg-primary text-primary-foreground px-5 py-3 rounded-full shadow-lg hover:opacity-90 active:scale-95 transition-all text-sm font-medium"
+        onClick={hasProfile ? onCreatePost : onProfile}
+        disabled={false}
+        className={`fixed bottom-8 right-8 z-30 flex items-center gap-2 px-5 py-3 rounded-full shadow-lg active:scale-95 transition-all text-sm font-medium ${
+          hasProfile
+            ? "bg-primary text-primary-foreground hover:opacity-90"
+            : "bg-muted text-muted-foreground cursor-not-allowed opacity-60"
+        }`}
         aria-label="Skapa nytt inlägg"
+        title={
+          !hasProfile
+            ? "Ange ditt visningsnamn i profilen för att skriva inlägg"
+            : undefined
+        }
       >
         <PenLine className="w-4 h-4" />
         Nytt inlägg

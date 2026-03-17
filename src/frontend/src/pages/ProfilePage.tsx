@@ -19,12 +19,163 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { UserRole } from "../backend.d";
 import type { UserProfile } from "../backend.d";
-import { useDeleteMyAccount } from "../hooks/useQueries";
+import { useDeleteMyAccount, useRegister } from "../hooks/useQueries";
 
 interface ProfilePageProps {
-  profile: UserProfile;
+  profile: UserProfile | null;
   onBack: () => void;
   onLogout: () => void;
+}
+
+function RegisterForm({ onBack }: { onBack: () => void }) {
+  const register = useRegister();
+  const [alias, setAlias] = useState("");
+  const [error, setError] = useState("");
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    const trimmed = alias.trim();
+    if (trimmed.length < 2) {
+      setError("Visningsnamnet måste vara minst 2 tecken.");
+      return;
+    }
+    if (trimmed.length > 32) {
+      setError("Visningsnamnet får vara högst 32 tecken.");
+      return;
+    }
+    try {
+      await register.mutateAsync(trimmed);
+      toast.success("Välkommen! Ditt visningsnamn är nu sparat.");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (
+        msg.toLowerCase().includes("taken") ||
+        msg.toLowerCase().includes("already")
+      ) {
+        setError("Det visningsnamnet är redan taget. Välj ett annat.");
+      } else if (
+        msg.toLowerCase().includes("too short") ||
+        msg.toLowerCase().includes("short")
+      ) {
+        setError("Visningsnamnet är för kort.");
+      } else {
+        setError("Något gick fel. Försök igen.");
+      }
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-background flex flex-col">
+      <div className="h-1 bg-primary w-full" />
+
+      <header className="border-b border-border bg-card">
+        <div className="max-w-2xl mx-auto px-6 py-4 flex items-center gap-4">
+          <Button
+            data-ocid="profile.back.button"
+            variant="ghost"
+            size="sm"
+            onClick={onBack}
+            className="text-muted-foreground -ml-2"
+          >
+            <ArrowLeft className="w-4 h-4 mr-1" />
+            Tillbaka
+          </Button>
+          <Separator orientation="vertical" className="h-5" />
+          <div className="flex items-center gap-2">
+            <BookOpen className="w-5 h-5 text-primary" strokeWidth={1.5} />
+            <span className="font-display text-xl text-foreground">
+              HKLOblogg
+            </span>
+          </div>
+        </div>
+      </header>
+
+      <main className="flex-1 max-w-2xl mx-auto w-full px-6 py-10">
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4 }}
+          className="space-y-8"
+        >
+          <div>
+            <h1 className="font-display text-3xl text-foreground mb-2">
+              Välkommen till HKLOblogg
+            </h1>
+            <p className="text-muted-foreground">
+              Välj ett visningsnamn för att komma igång.
+            </p>
+          </div>
+
+          <div className="bg-card border border-border rounded-xl p-6 shadow-card">
+            <div className="flex items-center gap-4 mb-6">
+              <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center">
+                <User className="w-7 h-7 text-primary" strokeWidth={1.5} />
+              </div>
+              <div>
+                <h2 className="font-display text-lg text-foreground">
+                  Skapa ditt konto
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  Visningsnamnet syns på alla dina inlägg och kommentarer.
+                </p>
+              </div>
+            </div>
+
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="register-alias">Visningsnamn</Label>
+                <Input
+                  id="register-alias"
+                  data-ocid="profile.register.input"
+                  value={alias}
+                  onChange={(e) => {
+                    setAlias(e.target.value);
+                    setError("");
+                  }}
+                  placeholder="Ditt namn eller alias (2–32 tecken)"
+                  autoComplete="off"
+                  autoFocus
+                  maxLength={32}
+                />
+                {error && (
+                  <p
+                    data-ocid="profile.register.error_state"
+                    className="text-sm text-destructive"
+                  >
+                    {error}
+                  </p>
+                )}
+              </div>
+              <Button
+                data-ocid="profile.register.submit_button"
+                type="submit"
+                className="w-full"
+                disabled={register.isPending || alias.trim().length < 2}
+              >
+                {register.isPending ? (
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                ) : null}
+                Registrera
+              </Button>
+            </form>
+          </div>
+        </motion.div>
+      </main>
+
+      <footer className="py-5 text-center text-xs text-muted-foreground border-t border-border">
+        © {new Date().getFullYear()}.{" "}
+        <a
+          href={`https://caffeine.ai?utm_source=caffeine-footer&utm_medium=referral&utm_content=${encodeURIComponent(window.location.hostname)}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="hover:text-foreground transition-colors"
+        >
+          Byggd med ❤ via caffeine.ai
+        </a>
+      </footer>
+    </div>
+  );
 }
 
 export default function ProfilePage({
@@ -35,6 +186,10 @@ export default function ProfilePage({
   const deleteMyAccount = useDeleteMyAccount();
   const [confirmAlias, setConfirmAlias] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
+
+  if (!profile) {
+    return <RegisterForm onBack={onBack} />;
+  }
 
   const isAdmin = profile.role === UserRole.admin;
   const registeredDate = new Date(
