@@ -74,6 +74,22 @@ actor {
     uploadedAt : Int;
   };
 
+  type NotificationEvent = {
+    #NewComment;
+    #NewReply;
+    #NewMedia;
+  };
+
+  type Notification = {
+    id : Nat;
+    recipientPrincipal : Principal;
+    postId : Text;
+    triggerPrincipal : Principal;
+    event : NotificationEvent;
+    createdAt : Time.Time;
+    read : Bool;
+  };
+
   let accessControlState = AccessControl.initState();
   include MixinAuthorization(accessControlState);
 
@@ -93,12 +109,40 @@ actor {
   var userFollows = Map.empty<Principal, List.List<Principal>>();  // caller -> list of followed users
   var postFollows = Map.empty<Text, List.List<Principal>>();       // postId -> list of followers
 
+  // Notification state
+  var notifications = Map.empty<Nat, Notification>();
+  var nextNotifId = 1;
+
   func requireActiveUser(caller : Principal) : UserProfile {
     switch (userProfiles.get(caller)) {
       case (null) { Runtime.trap("Unauthorized: Must be registered") };
       case (?profile) {
         if (profile.blocked) { Runtime.trap("Unauthorized: Blocked users cannot perform this action") };
         profile;
+      };
+    };
+  };
+
+  // Internal helper: notify all post followers except the triggering user
+  func notifyPostFollowers(postId : Text, triggerPrincipal : Principal, event : NotificationEvent) {
+    switch (postFollows.get(postId)) {
+      case (null) {};
+      case (?followers) {
+        for (recipient in followers.toArray().vals()) {
+          if (recipient != triggerPrincipal) {
+            let notif : Notification = {
+              id = nextNotifId;
+              recipientPrincipal = recipient;
+              postId;
+              triggerPrincipal;
+              event;
+              createdAt = Time.now();
+              read = false;
+            };
+            notifications.add(nextNotifId, notif);
+            nextNotifId += 1;
+          };
+        };
       };
     };
   };
@@ -166,15 +210,24 @@ actor {
 
     // Remove user from follow state
     userFollows.remove(user);
-    // Remove user from all other users' follow lists
     for ((follower, followedList) in userFollows.entries()) {
       let filtered = followedList.filter(func(p) { p != user });
       userFollows.add(follower, filtered);
     };
-    // Remove user from all post follow lists
     for ((pid, followerList) in postFollows.entries()) {
       let filtered = followerList.filter(func(p) { p != user });
       postFollows.add(pid, filtered);
+    };
+
+    // Remove notifications for/by the deleted user
+    let toDeleteNotifs = List.empty<Nat>();
+    for ((nid, notif) in notifications.entries()) {
+      if (notif.recipientPrincipal == user or notif.triggerPrincipal == user) {
+        toDeleteNotifs.add(nid);
+      };
+    };
+    for (nid in toDeleteNotifs.toArray().vals()) {
+      notifications.remove(nid);
     };
   };
 
@@ -232,7 +285,6 @@ actor {
           case (_) { false };
         };
         if (not isHidden) { return true };
-        // Hidden -- check if caller is in allowedUsers
         switch (categoryAllowedUsers.get(c.id)) {
           case (null) { false };
           case (?allowedList) { allowedList.any(func(p) { p == caller }) };
@@ -503,6 +555,14 @@ actor {
           comments.remove(cid);
           commentLikes.remove(cid);
         };
+        // Remove notifications for this post
+        let toDeleteNotifs = List.empty<Nat>();
+        for ((nid, notif) in notifications.entries()) {
+          if (notif.postId == postId) { toDeleteNotifs.add(nid) };
+        };
+        for (nid in toDeleteNotifs.toArray().vals()) {
+          notifications.remove(nid);
+        };
       };
     };
   };
@@ -623,6 +683,13 @@ actor {
     };
 
     comments.add(commentId, comment);
+
+    // Notify post followers
+    let event : NotificationEvent = switch (parentId) {
+      case (?_) { #NewReply };
+      case (null) { #NewComment };
+    };
+    notifyPostFollowers(postId, caller, event);
   };
 
   public shared ({ caller }) func editComment(commentId : Text, body : Text) : async () {
@@ -764,6 +831,16 @@ actor {
     };
 
     mediaFiles.add(mediaId, media);
+
+    // Notify post followers when media is uploaded to a post
+    switch (postId) {
+      case (?pid) {
+        let pidText = pid.toText();
+        notifyPostFollowers(pidText, caller, #NewMedia);
+      };
+      case (null) {};
+    };
+
     mediaId;
   };
 
@@ -922,6 +999,59 @@ actor {
     switch (postFollows.get(postId)) {
       case (null) { 0 };
       case (?list) { list.size() };
+    };
+  };
+
+  // ====== NOTIFICATION FUNCTIONS ======
+
+  public query ({ caller }) func getMyNotifications() : async [Notification] {
+    let _ = requireActiveUser(caller);
+    notifications.values().toArray().filter(func(n) { n.recipientPrincipal == caller });
+  };
+
+  public query ({ caller }) func getUnreadNotificationCount() : async Nat {
+    let _ = requireActiveUser(caller);
+    var count = 0;
+    for ((_, notif) in notifications.entries()) {
+      if (notif.recipientPrincipal == caller and not notif.read) {
+        count += 1;
+      };
+    };
+    count;
+  };
+
+  public shared ({ caller }) func markNotificationRead(notifId : Nat) : async () {
+    let _ = requireActiveUser(caller);
+    switch (notifications.get(notifId)) {
+      case (null) { Runtime.trap("Notification not found") };
+      case (?notif) {
+        if (notif.recipientPrincipal != caller) {
+          Runtime.trap("Unauthorized: Not your notification");
+        };
+        notifications.add(notifId, { notif with read = true });
+      };
+    };
+  };
+
+  public shared ({ caller }) func markAllNotificationsRead() : async () {
+    let _ = requireActiveUser(caller);
+    for ((nid, notif) in notifications.entries()) {
+      if (notif.recipientPrincipal == caller and not notif.read) {
+        notifications.add(nid, { notif with read = true });
+      };
+    };
+  };
+
+  public shared ({ caller }) func deleteNotification(notifId : Nat) : async () {
+    let _ = requireActiveUser(caller);
+    switch (notifications.get(notifId)) {
+      case (null) { Runtime.trap("Notification not found") };
+      case (?notif) {
+        if (notif.recipientPrincipal != caller) {
+          Runtime.trap("Unauthorized: Not your notification");
+        };
+        notifications.remove(notifId);
+      };
     };
   };
 };

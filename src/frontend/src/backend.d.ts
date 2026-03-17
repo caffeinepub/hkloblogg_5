@@ -64,6 +64,16 @@ export enum UserRole {
     user = "user",
     guest = "guest"
 }
+export type NotificationEvent = "NewComment" | "NewReply" | "NewMedia";
+export interface Notification {
+    id: bigint;
+    recipientPrincipal: Principal;
+    postId: string;
+    triggerPrincipal: Principal;
+    event: NotificationEvent;
+    createdAt: Time;
+    read: boolean;
+}
 export interface backendInterface {
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
     blockUser(user: Principal): Promise<void>;
@@ -117,4 +127,9 @@ export interface backendInterface {
     isFollowingUser(userToCheck: Principal): Promise<boolean>;
     isFollowingPost(postId: string): Promise<boolean>;
     getPostFollowerCount(postId: string): Promise<bigint>;
+    getMyNotifications(): Promise<Array<Notification>>;
+    getUnreadNotificationCount(): Promise<bigint>;
+    markNotificationRead(notifId: bigint): Promise<void>;
+    markAllNotificationsRead(): Promise<void>;
+    deleteNotification(notifId: bigint): Promise<void>;
 }
