@@ -13,12 +13,34 @@ export interface Category {
     createdAt: Time;
     createdBy: Principal;
 }
+export interface SearchResult {
+    comments: Array<Comment>;
+    posts: Array<Post>;
+}
+export interface MediaFile {
+    id: bigint;
+    commentId?: bigint;
+    ownerId: Principal;
+    blobKey: string;
+    fileName: string;
+    fileSize: bigint;
+    fileType: string;
+    uploadedAt: bigint;
+    postId?: bigint;
+}
 export type Time = bigint;
-export interface UserProfile {
-    alias: string;
-    blocked: boolean;
-    role: UserRole;
-    registeredAt: Time;
+export interface Comment {
+    id: string;
+    likeCount: bigint;
+    body: string;
+    createdAt: Time;
+    parentId?: string;
+    authorPrincipal: Principal;
+    postId: string;
+}
+export interface UserWithPrincipal {
+    principal: Principal;
+    profile: UserProfile;
 }
 export interface Post {
     id: string;
@@ -31,18 +53,11 @@ export interface Post {
     pinned: boolean;
     authorPrincipal: Principal;
 }
-export interface Comment {
-    id: string;
-    postId: string;
-    parentId: string | null;
-    body: string;
-    authorPrincipal: Principal;
-    createdAt: Time;
-    likeCount: bigint;
-}
-export interface SearchResult {
-    posts: Array<Post>;
-    comments: Array<Comment>;
+export interface UserProfile {
+    alias: string;
+    blocked: boolean;
+    role: UserRole;
+    registeredAt: Time;
 }
 export enum UserRole {
     admin = "admin",
@@ -56,11 +71,19 @@ export interface backendInterface {
     createComment(postId: string, body: string, parentId: string | null): Promise<void>;
     createPost(title: string, body: string, categoryId: string): Promise<void>;
     deleteCategory(id: string): Promise<void>;
+    toggleCategoryHidden(id: string, hidden: boolean): Promise<void>;
+    getHiddenCategoryIds(): Promise<Array<string>>;
     deleteComment(commentId: string): Promise<void>;
+    deleteMedia(mediaId: bigint): Promise<void>;
+    deleteMyAccount(): Promise<void>;
     deletePost(postId: string): Promise<void>;
+    deleteUser(user: Principal): Promise<void>;
     editComment(commentId: string, body: string): Promise<void>;
     editPost(postId: string, title: string, body: string, categoryId: string): Promise<void>;
+    getAllMedia(): Promise<Array<MediaFile>>;
     getCallerUserRole(): Promise<UserRole>;
+    getMediaForComment(commentId: bigint): Promise<Array<MediaFile>>;
+    getMediaForPost(postId: bigint): Promise<Array<MediaFile>>;
     getMyLikedComments(): Promise<Array<string>>;
     getMyLikedPosts(): Promise<Array<string>>;
     getMyProfile(): Promise<UserProfile | null>;
@@ -74,9 +97,11 @@ export interface backendInterface {
     listPosts(categoryId: string | null): Promise<Array<Post>>;
     listPostsByAuthor(alias: string): Promise<Array<Post>>;
     listUsers(): Promise<Array<UserProfile>>;
+    listUsersWithPrincipal(): Promise<Array<UserWithPrincipal>>;
     pinPost(postId: string, pinned: boolean): Promise<void>;
     register(alias: string): Promise<void>;
     search(searchQuery: string): Promise<SearchResult>;
     setRole(user: Principal, role: UserRole): Promise<void>;
     unblockUser(user: Principal): Promise<void>;
+    uploadMedia(postId: bigint | null, commentId: bigint | null, fileType: string, fileName: string, fileSize: bigint, blobKey: string): Promise<bigint>;
 }

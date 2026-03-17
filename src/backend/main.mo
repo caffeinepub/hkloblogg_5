@@ -7,13 +7,13 @@ import Principal "mo:core/Principal";
 import AccessControl "authorization/access-control";
 import MixinAuthorization "authorization/MixinAuthorization";
 import Iter "mo:core/Iter";
+import Storage "blob-storage/Storage";
+import MixinStorage "blob-storage/Mixin";
 
 
 
 actor {
-  // State
-  let accessControlState = AccessControl.initState();
-  include MixinAuthorization(accessControlState);
+  include MixinStorage();
 
   type UserRole = AccessControl.UserRole;
   type UserProfile = {
@@ -21,6 +21,11 @@ actor {
     role : UserRole;
     blocked : Bool;
     registeredAt : Time.Time;
+  };
+
+  type UserWithPrincipal = {
+    principal : Principal;
+    profile : UserProfile;
   };
 
   type Category = {
@@ -57,15 +62,32 @@ actor {
     comments : [Comment];
   };
 
+  type MediaFile = {
+    id : Nat;
+    ownerId : Principal;
+    postId : ?Nat;
+    commentId : ?Nat;
+    fileType : Text;
+    fileName : Text;
+    fileSize : Nat;
+    blobKey : Text; // Storage.ExternalBlob reference
+    uploadedAt : Int;
+  };
+
+  let accessControlState = AccessControl.initState();
+  include MixinAuthorization(accessControlState);
+
   let userProfiles = Map.empty<Principal, UserProfile>();
   let categories = Map.empty<Text, Category>();
+  let categoryHidden = Map.empty<Text, Bool>();
   var posts = Map.empty<Text, Post>();
   var postLikes = Map.empty<Text, List.List<Principal>>();
   var comments = Map.empty<Text, Comment>();
   var commentLikes = Map.empty<Text, List.List<Principal>>();
   var isFirstUserRegistered : Bool = false;
+  var mediaFiles = Map.empty<Nat, MediaFile>();
+  var nextMediaId = 1;
 
-  // Helper: check caller is authenticated and not blocked
   func requireActiveUser(caller : Principal) : UserProfile {
     switch (userProfiles.get(caller)) {
       case (null) { Runtime.trap("Unauthorized: Must be registered") };
@@ -76,12 +98,72 @@ actor {
     };
   };
 
-  // User Queries
+  func deleteUserContent(user : Principal) {
+    let userPostIds = List.empty<Text>();
+    for ((postId, post) in posts.entries()) {
+      if (post.authorPrincipal == user) {
+        userPostIds.add(postId);
+      };
+    };
+
+    for (postId in userPostIds.toArray().vals()) {
+      posts.remove(postId);
+      postLikes.remove(postId);
+      let postCommentIds = List.empty<Text>();
+      for ((cid, c) in comments.entries()) {
+        if (c.postId == postId) {
+          postCommentIds.add(cid);
+        };
+      };
+      for (cid in postCommentIds.toArray().vals()) {
+        comments.remove(cid);
+        commentLikes.remove(cid);
+      };
+    };
+
+    let userCommentIds = List.empty<Text>();
+    for ((cid, c) in comments.entries()) {
+      if (c.authorPrincipal == user) {
+        userCommentIds.add(cid);
+      };
+    };
+    for (cid in userCommentIds.toArray().vals()) {
+      comments.remove(cid);
+      commentLikes.remove(cid);
+      let childCommentIds = List.empty<Text>();
+      for ((childId, child) in comments.entries()) {
+        switch (child.parentId) {
+          case (?pid) { if (pid == cid) { childCommentIds.add(childId) } };
+          case (null) {};
+        };
+      };
+      for (childId in childCommentIds.toArray().vals()) {
+        comments.remove(childId);
+        commentLikes.remove(childId);
+      };
+    };
+
+    for ((postId, likes) in postLikes.entries()) {
+      let filtered = likes.filter(func(p) { p != user });
+      postLikes.add(postId, filtered);
+    };
+    for ((commentId, likes) in commentLikes.entries()) {
+      let filtered = likes.filter(func(p) { p != user });
+      commentLikes.add(commentId, filtered);
+    };
+  };
+
   public query ({ caller }) func getMyProfile() : async ?UserProfile {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only registered users can view profiles");
+    };
     userProfiles.get(caller);
   };
 
   public query ({ caller }) func getUser(user : Principal) : async ?UserProfile {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only registered users can view profiles");
+    };
     userProfiles.get(user);
   };
 
@@ -92,7 +174,18 @@ actor {
     userProfiles.values().toArray();
   };
 
-  // Category Queries
+  public query ({ caller }) func listUsersWithPrincipal() : async [UserWithPrincipal] {
+    if (not (AccessControl.isAdmin(accessControlState, caller))) {
+      Runtime.trap("Unauthorized: Only superadmin can list users with principals");
+    };
+
+    let result = List.empty<UserWithPrincipal>();
+    for ((principal, profile) in userProfiles.entries()) {
+      result.add({ principal; profile });
+    };
+    result.toArray();
+  };
+
   public query ({ caller }) func listCategories() : async [Category] {
     switch (userProfiles.get(caller)) {
       case (null) {
@@ -104,10 +197,19 @@ actor {
         };
       };
     };
-    categories.values().toArray();
+    let isAdmin = AccessControl.isAdmin(accessControlState, caller);
+    if (isAdmin) {
+      categories.values().toArray();
+    } else {
+      categories.values().filter(func(c) {
+        switch (categoryHidden.get(c.id)) {
+          case (?true) { false };
+          case (_) { true };
+        };
+      }).toArray();
+    };
   };
 
-  // User Updates
   public shared ({ caller }) func register(alias : Text) : async () {
     if (userProfiles.containsKey(caller)) {
       Runtime.trap("User already registered");
@@ -176,7 +278,34 @@ actor {
     };
   };
 
-  // Category Updates
+  public shared ({ caller }) func deleteUser(user : Principal) : async () {
+    if (not (AccessControl.isAdmin(accessControlState, caller))) {
+      Runtime.trap("Unauthorized: Only superadmin can delete users");
+    };
+
+    if (not userProfiles.containsKey(user)) {
+      Runtime.trap("User not found");
+    };
+
+    deleteUserContent(user);
+    userProfiles.remove(user);
+    AccessControl.assignRole(accessControlState, caller, user, #guest);
+  };
+
+  public shared ({ caller }) func deleteMyAccount() : async () {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only registered users can delete their account");
+    };
+
+    if (not userProfiles.containsKey(caller)) {
+      Runtime.trap("User not found");
+    };
+
+    deleteUserContent(caller);
+    userProfiles.remove(caller);
+    AccessControl.assignRole(accessControlState, caller, caller, #guest);
+  };
+
   public shared ({ caller }) func createCategory(name : Text) : async () {
     if (not (AccessControl.isAdmin(accessControlState, caller))) {
       Runtime.trap("Unauthorized: Only superadmin can create categories");
@@ -205,7 +334,29 @@ actor {
     categories.remove(id);
   };
 
-  // Post Methods
+  public shared ({ caller }) func toggleCategoryHidden(id : Text, hidden : Bool) : async () {
+    if (not (AccessControl.isAdmin(accessControlState, caller))) {
+      Runtime.trap("Unauthorized: Only superadmin can toggle category visibility");
+    };
+
+    if (not categories.containsKey(id)) {
+      Runtime.trap("Category not found");
+    };
+
+    if (hidden) {
+      categoryHidden.add(id, true);
+    } else {
+      categoryHidden.remove(id);
+    };
+  };
+
+  public query ({ caller }) func getHiddenCategoryIds() : async [Text] {
+    if (not (AccessControl.isAdmin(accessControlState, caller))) {
+      Runtime.trap("Unauthorized: Only superadmin can view hidden categories");
+    };
+    categoryHidden.keys().toArray();
+  };
+
   public shared ({ caller }) func createPost(title : Text, body : Text, categoryId : Text) : async () {
     let _ = requireActiveUser(caller);
 
@@ -256,7 +407,6 @@ actor {
         };
         posts.remove(postId);
         postLikes.remove(postId);
-        // Clean up comments for this post
         let toDelete = List.empty<Text>();
         for ((cid, c) in comments.entries()) {
           if (c.postId == postId) { toDelete.add(cid) };
@@ -317,7 +467,6 @@ actor {
     };
   };
 
-  // Post Queries
   public query ({ caller }) func getPost(postId : Text) : async ?Post {
     let _ = requireActiveUser(caller);
     posts.get(postId);
@@ -357,8 +506,6 @@ actor {
     };
     likedPosts.toArray();
   };
-
-  // ========== COMMENT METHODS ==========
 
   public shared ({ caller }) func createComment(postId : Text, body : Text, parentId : ?Text) : async () {
     let _ = requireActiveUser(caller);
@@ -413,7 +560,6 @@ actor {
         };
         comments.remove(commentId);
         commentLikes.remove(commentId);
-        // Remove child comments
         let toDelete = List.empty<Text>();
         for ((cid, child) in comments.entries()) {
           switch (child.parentId) {
@@ -481,7 +627,6 @@ actor {
     liked.toArray();
   };
 
-  // Search
   public query ({ caller }) func search(searchQuery : Text) : async SearchResult {
     let _ = requireActiveUser(caller);
 
@@ -500,5 +645,66 @@ actor {
     });
 
     { posts = matchedPosts; comments = matchedComments };
+  };
+
+  // ====== MEDIA FILE FUNCTIONS ======
+
+  public shared ({ caller }) func uploadMedia(postId : ?Nat, commentId : ?Nat, fileType : Text, fileName : Text, fileSize : Nat, blobKey : Text) : async Nat {
+    let _ = requireActiveUser(caller);
+
+    let maxSize = if (fileType == "image") { 15_728_640 } else if (fileType == "video") {
+      31_457_280;
+    } else { Runtime.trap("Invalid file type") };
+
+    if (fileSize > maxSize) {
+      Runtime.trap("File size exceeds limit");
+    };
+
+    let mediaId = nextMediaId;
+    nextMediaId += 1;
+
+    let media : MediaFile = {
+      id = mediaId;
+      ownerId = caller;
+      postId;
+      commentId;
+      fileType;
+      fileName;
+      fileSize;
+      blobKey;
+      uploadedAt = Time.now();
+    };
+
+    mediaFiles.add(mediaId, media);
+    mediaId;
+  };
+
+  public query ({ caller }) func getMediaForPost(postId : Nat) : async [MediaFile] {
+    let _ = requireActiveUser(caller);
+    mediaFiles.values().toArray().filter(func(m) { switch (m.postId) { case (?id) { id == postId }; case (null) { false } } });
+  };
+
+  public query ({ caller }) func getMediaForComment(commentId : Nat) : async [MediaFile] {
+    let _ = requireActiveUser(caller);
+    mediaFiles.values().toArray().filter(func(m) { switch (m.commentId) { case (?id) { id == commentId }; case (null) { false } } });
+  };
+
+  public shared ({ caller }) func deleteMedia(mediaId : Nat) : async () {
+    switch (mediaFiles.get(mediaId)) {
+      case (null) { Runtime.trap("Media file not found") };
+      case (?media) {
+        if (media.ownerId != caller and not AccessControl.isAdmin(accessControlState, caller)) {
+          Runtime.trap("Unauthorized: Only owner or admin can delete media");
+        };
+        mediaFiles.remove(mediaId);
+      };
+    };
+  };
+
+  public query ({ caller }) func getAllMedia() : async [MediaFile] {
+    if (not (AccessControl.isAdmin(accessControlState, caller))) {
+      Runtime.trap("Unauthorized: Only admin can access all media");
+    };
+    mediaFiles.values().toArray();
   };
 };

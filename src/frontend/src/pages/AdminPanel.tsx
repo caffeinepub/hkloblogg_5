@@ -23,16 +23,20 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
   BookOpen,
+  Eye,
+  EyeOff,
   FileText,
+  Images,
   Loader2,
   MessageCircle,
   Pin,
   PinOff,
   Plus,
+  Search,
   Shield,
   Tag,
   Trash2,
@@ -42,48 +46,84 @@ import { motion } from "motion/react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { UserRole } from "../backend.d";
-import type { Category, Comment, Post, UserProfile } from "../backend.d";
+import type {
+  Category,
+  Comment,
+  MediaFile,
+  Post,
+  UserWithPrincipal,
+} from "../backend.d";
 import type { Comment as CommentType } from "../backend.d";
 import AuthorName from "../components/AuthorName";
 import { useActor } from "../hooks/useActor";
 import {
+  useBlockUser,
   useCreateCategory,
   useDeleteCategory,
   useDeleteComment,
   useDeletePost,
+  useDeleteUser,
+  useGetHiddenCategoryIds,
   useListCategories,
   useListPosts,
-  useListUsers,
+  useListUsersWithPrincipal,
   usePinPost,
+  useSetRole,
+  useToggleCategoryHidden,
+  useUnblockUser,
 } from "../hooks/useQueries";
 
 interface AdminPanelProps {
   onBack: () => void;
 }
 
-function CategoryRow({
-  category,
-  index,
-}: {
-  category: Category;
-  index: number;
-}) {
-  const deleteCategory = useDeleteCategory();
+function formatFileSize(bytes: bigint): string {
+  const n = Number(bytes);
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)} KB`;
+  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function MediaRow({ media, index }: { media: MediaFile; index: number }) {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+  const [deleting, setDeleting] = useState(false);
 
   const handleDelete = async () => {
+    if (!actor) return;
+    setDeleting(true);
     try {
-      await deleteCategory.mutateAsync(category.id);
-      toast.success(`Kategori "${category.name}" raderad.`);
+      await actor.deleteMedia(media.id);
+      queryClient.invalidateQueries({ queryKey: ["allMedia"] });
+      toast.success("Mediafilen raderades.");
     } catch {
-      toast.error("Kunde inte radera kategorin.");
+      toast.error("Kunde inte radera mediafilen.");
+    } finally {
+      setDeleting(false);
     }
   };
 
   return (
-    <TableRow data-ocid={`admin.categories.item.${index}`}>
-      <TableCell className="font-medium">{category.name}</TableCell>
+    <TableRow data-ocid={`admin.media.item.${index}`}>
+      <TableCell className="font-medium max-w-[160px] truncate">
+        {media.fileName}
+      </TableCell>
+      <TableCell>
+        <Badge variant="outline" className="text-xs">
+          {media.fileType === "image" ? "Bild" : "Video"}
+        </Badge>
+      </TableCell>
       <TableCell className="text-muted-foreground text-sm">
-        {new Date(Number(category.createdAt) / 1_000_000).toLocaleDateString(
+        {formatFileSize(media.fileSize)}
+      </TableCell>
+      <TableCell className="text-muted-foreground text-sm">
+        {media.postId != null
+          ? "Inlägg"
+          : media.commentId != null
+            ? "Kommentar"
+            : "-"}
+      </TableCell>
+      <TableCell className="text-muted-foreground text-sm">
+        {new Date(Number(media.uploadedAt) / 1_000_000).toLocaleDateString(
           "sv-SE",
         )}
       </TableCell>
@@ -91,33 +131,33 @@ function CategoryRow({
         <AlertDialog>
           <AlertDialogTrigger asChild>
             <Button
-              data-ocid={`admin.categories.delete_button.${index}`}
+              data-ocid={`admin.media.delete_button.${index}`}
               variant="ghost"
               size="sm"
+              disabled={deleting}
               className="text-destructive hover:text-destructive hover:bg-destructive/10"
-              disabled={deleteCategory.isPending}
             >
-              {deleteCategory.isPending ? (
+              {deleting ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
                 <Trash2 className="h-4 w-4" />
               )}
             </Button>
           </AlertDialogTrigger>
-          <AlertDialogContent data-ocid="admin.categories.dialog">
+          <AlertDialogContent data-ocid="admin.media.dialog">
             <AlertDialogHeader>
-              <AlertDialogTitle>Radera kategori</AlertDialogTitle>
+              <AlertDialogTitle>Radera mediafil</AlertDialogTitle>
               <AlertDialogDescription>
-                Är du säker på att du vill radera kategorin &ldquo;
-                {category.name}&rdquo;? Detta kan inte ångras.
+                Är du säker på att du vill radera &ldquo;{media.fileName}
+                &rdquo;? Detta kan inte ångras.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel data-ocid="admin.categories.cancel_button">
+              <AlertDialogCancel data-ocid="admin.media.cancel_button">
                 Avbryt
               </AlertDialogCancel>
               <AlertDialogAction
-                data-ocid="admin.categories.confirm_button"
+                data-ocid="admin.media.confirm_button"
                 onClick={handleDelete}
                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               >
@@ -131,32 +171,196 @@ function CategoryRow({
   );
 }
 
-function UserRow({ user, index }: { user: UserProfile; index: number }) {
-  const isAdmin = user.role === UserRole.admin;
+function CategoryRow({
+  category,
+  isHidden,
+  index,
+}: {
+  category: Category;
+  isHidden: boolean;
+  index: number;
+}) {
+  const deleteCategory = useDeleteCategory();
+  const toggleHidden = useToggleCategoryHidden();
 
-  const handleBlock = async () => {
-    toast.error(
-      "Blockeringsfunktion kräver principal-lookup (implementeras i fas 3).",
-    );
+  const handleDelete = async () => {
+    try {
+      await deleteCategory.mutateAsync(category.id);
+      toast.success(`Kategori "${category.name}" raderad.`);
+    } catch {
+      toast.error("Kunde inte radera kategorin.");
+    }
   };
 
-  const handleRoleToggle = async () => {
-    toast.error("Rollbyte kräver principal-lookup (implementeras i fas 3).");
+  const handleToggleHidden = async () => {
+    try {
+      await toggleHidden.mutateAsync({
+        id: category.id,
+        hidden: !isHidden,
+      });
+      toast.success(
+        isHidden
+          ? `Kategori "${category.name}" är nu synlig.`
+          : `Kategori "${category.name}" är nu dold.`,
+      );
+    } catch {
+      toast.error("Kunde inte ändra synlighet.");
+    }
   };
 
   return (
     <TableRow
-      data-ocid={`admin.users.item.${index}`}
-      className={user.blocked ? "opacity-60" : ""}
+      data-ocid={`admin.categories.item.${index}`}
+      className={isHidden ? "opacity-60" : ""}
     >
-      <TableCell className="font-medium">{user.alias}</TableCell>
+      <TableCell className="font-medium">
+        <div className="flex items-center gap-2">
+          {category.name}
+          {isHidden && (
+            <Badge variant="secondary" className="text-xs gap-1">
+              <EyeOff className="h-2.5 w-2.5" />
+              Dold
+            </Badge>
+          )}
+        </div>
+      </TableCell>
+      <TableCell className="text-muted-foreground text-sm">
+        {new Date(Number(category.createdAt) / 1_000_000).toLocaleDateString(
+          "sv-SE",
+        )}
+      </TableCell>
+      <TableCell className="text-right">
+        <div className="flex items-center justify-end gap-1">
+          <Button
+            data-ocid={`admin.categories.toggle.${index}`}
+            variant="ghost"
+            size="sm"
+            onClick={handleToggleHidden}
+            disabled={toggleHidden.isPending}
+            title={isHidden ? "Visa kategori" : "Dölj kategori"}
+            className="text-muted-foreground hover:text-foreground"
+          >
+            {toggleHidden.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : isHidden ? (
+              <Eye className="h-4 w-4" />
+            ) : (
+              <EyeOff className="h-4 w-4" />
+            )}
+          </Button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button
+                data-ocid={`admin.categories.delete_button.${index}`}
+                variant="ghost"
+                size="sm"
+                className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                disabled={deleteCategory.isPending}
+              >
+                {deleteCategory.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Trash2 className="h-4 w-4" />
+                )}
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent data-ocid="admin.categories.dialog">
+              <AlertDialogHeader>
+                <AlertDialogTitle>Radera kategori</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Är du säker på att du vill radera kategorin &ldquo;
+                  {category.name}&rdquo;? Detta kan inte ångras.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel data-ocid="admin.categories.cancel_button">
+                  Avbryt
+                </AlertDialogCancel>
+                <AlertDialogAction
+                  data-ocid="admin.categories.confirm_button"
+                  onClick={handleDelete}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  Radera
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
+      </TableCell>
+    </TableRow>
+  );
+}
+
+function UserRow({
+  user,
+  index,
+}: {
+  user: UserWithPrincipal;
+  index: number;
+}) {
+  const isAdmin = user.profile.role === UserRole.admin;
+  const blockUser = useBlockUser();
+  const unblockUser = useUnblockUser();
+  const setRole = useSetRole();
+  const deleteUser = useDeleteUser();
+
+  const handleBlock = async () => {
+    try {
+      if (user.profile.blocked) {
+        await unblockUser.mutateAsync(user.principal);
+        toast.success(`${user.profile.alias} avblockerades.`);
+      } else {
+        await blockUser.mutateAsync(user.principal);
+        toast.success(`${user.profile.alias} blockerades.`);
+      }
+    } catch {
+      toast.error("Kunde inte ändra blockeringsstatus.");
+    }
+  };
+
+  const handleRoleToggle = async () => {
+    try {
+      const newRole = isAdmin ? UserRole.user : UserRole.admin;
+      await setRole.mutateAsync({ principal: user.principal, role: newRole });
+      toast.success(
+        isAdmin
+          ? `${user.profile.alias} är inte längre admin.`
+          : `${user.profile.alias} är nu admin.`,
+      );
+    } catch {
+      toast.error("Kunde inte ändra roll.");
+    }
+  };
+
+  const handleDelete = async () => {
+    try {
+      await deleteUser.mutateAsync(user.principal);
+      toast.success(`Användaren ${user.profile.alias} raderades.`);
+    } catch {
+      toast.error("Kunde inte radera användaren.");
+    }
+  };
+
+  const isActing =
+    blockUser.isPending ||
+    unblockUser.isPending ||
+    setRole.isPending ||
+    deleteUser.isPending;
+
+  return (
+    <TableRow
+      data-ocid={`admin.users.item.${index}`}
+      className={user.profile.blocked ? "opacity-60" : ""}
+    >
+      <TableCell className="font-medium">{user.profile.alias}</TableCell>
       <TableCell>
         <Badge variant={isAdmin ? "default" : "secondary"} className="text-xs">
           {isAdmin ? "Admin" : "Användare"}
         </Badge>
       </TableCell>
       <TableCell>
-        {user.blocked ? (
+        {user.profile.blocked ? (
           <Badge variant="destructive" className="text-xs">
             Blockerad
           </Badge>
@@ -173,19 +377,60 @@ function UserRow({ user, index }: { user: UserProfile; index: number }) {
             variant="ghost"
             size="sm"
             onClick={handleBlock}
+            disabled={isActing}
             className="text-muted-foreground hover:text-foreground text-xs"
           >
-            {user.blocked ? "Avblockera" : "Blockera"}
+            {user.profile.blocked ? "Avblockera" : "Blockera"}
           </Button>
           <Button
             data-ocid={`admin.users.edit_button.${index}`}
             variant="ghost"
             size="sm"
             onClick={handleRoleToggle}
+            disabled={isActing}
             className="text-muted-foreground hover:text-foreground text-xs"
           >
             {isAdmin ? "Ta bort admin" : "Gör admin"}
           </Button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button
+                data-ocid={`admin.users.delete_button.${index}`}
+                variant="ghost"
+                size="sm"
+                disabled={isActing}
+                className="text-destructive hover:text-destructive hover:bg-destructive/10"
+              >
+                {deleteUser.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Trash2 className="h-4 w-4" />
+                )}
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent data-ocid="admin.users.dialog">
+              <AlertDialogHeader>
+                <AlertDialogTitle>Radera användare</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Är du säker på att du vill radera {user.profile.alias}? Alla
+                  deras inlägg och kommentarer raderas permanent. Detta kan inte
+                  ångras.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel data-ocid="admin.users.cancel_button">
+                  Avbryt
+                </AlertDialogCancel>
+                <AlertDialogAction
+                  data-ocid="admin.users.confirm_button"
+                  onClick={handleDelete}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  Radera
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       </TableCell>
     </TableRow>
@@ -297,95 +542,77 @@ function useAllComments() {
     queryKey: ["admin", "allComments"],
     queryFn: async () => {
       if (!actor) return [];
-      // We don't have a listAllComments endpoint — fetch comments for each post
-      // For now return empty; actual data requires per-post fetching
       return [];
     },
     enabled: !!actor && !isFetching,
   });
 }
 
-function AdminCommentRow({
-  comment,
-  index,
-}: { comment: Comment; index: number }) {
-  const deleteComment = useDeleteComment();
-
-  const handleDelete = async () => {
-    try {
-      await deleteComment.mutateAsync({
-        commentId: comment.id,
-        postId: comment.postId,
-      });
-      toast.success("Kommentar raderad.");
-    } catch {
-      toast.error("Kunde inte radera kommentaren.");
-    }
-  };
-
-  return (
-    <TableRow data-ocid={`admin.comments.item.${index}`}>
-      <TableCell className="max-w-64">
-        <p className="truncate text-sm text-foreground">{comment.body}</p>
-      </TableCell>
-      <TableCell className="text-muted-foreground text-sm">
-        <AuthorName principal={comment.authorPrincipal} />
-      </TableCell>
-      <TableCell className="text-muted-foreground text-sm">
-        {new Date(Number(comment.createdAt) / 1_000_000).toLocaleDateString(
-          "sv-SE",
-        )}
-      </TableCell>
-      <TableCell className="text-right">
-        <AlertDialog>
-          <AlertDialogTrigger asChild>
-            <Button
-              data-ocid={`admin.comments.delete_button.${index}`}
-              variant="ghost"
-              size="sm"
-              className="text-destructive hover:text-destructive hover:bg-destructive/10"
-              disabled={deleteComment.isPending}
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
-          </AlertDialogTrigger>
-          <AlertDialogContent data-ocid="admin.comments.dialog">
-            <AlertDialogHeader>
-              <AlertDialogTitle>Radera kommentar</AlertDialogTitle>
-              <AlertDialogDescription>
-                Är du säker på att du vill radera kommentaren? Detta kan inte
-                ångras.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel data-ocid="admin.comments.cancel_button">
-                Avbryt
-              </AlertDialogCancel>
-              <AlertDialogAction
-                data-ocid="admin.comments.confirm_button"
-                onClick={handleDelete}
-                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              >
-                Radera
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      </TableCell>
-    </TableRow>
-  );
-}
-
 export default function AdminPanel({ onBack }: AdminPanelProps) {
   const { data: categories, isLoading: loadingCats } = useListCategories();
-  const { data: users, isLoading: loadingUsers } = useListUsers();
+  const { data: hiddenCategoryIds } = useGetHiddenCategoryIds();
+  const { data: users, isLoading: loadingUsers } = useListUsersWithPrincipal();
   const { data: posts, isLoading: loadingPosts } = useListPosts(null);
   const { data: allComments, isLoading: loadingComments } = useAllComments();
   const createCategory = useCreateCategory();
+  const { actor } = useActor();
   const [newCatName, setNewCatName] = useState("");
   const [catError, setCatError] = useState("");
 
+  // Search state per tab
+  const [catSearch, setCatSearch] = useState("");
+  const [userSearch, setUserSearch] = useState("");
+  const [postSearch, setPostSearch] = useState("");
+  const [mediaSearch, setMediaSearch] = useState("");
+
+  const hiddenIdsSet = new Set(hiddenCategoryIds ?? []);
+
+  const { data: allMedia, isLoading: loadingMedia } = useQuery<MediaFile[]>({
+    queryKey: ["allMedia"],
+    queryFn: async () => {
+      if (!actor) return [];
+      return actor.getAllMedia();
+    },
+    enabled: !!actor,
+  });
+
+  const filteredMedia = (allMedia ?? []).filter((m) => {
+    const q = mediaSearch.toLowerCase();
+    if (!q) return true;
+    const date = new Date(Number(m.uploadedAt) / 1_000_000).toLocaleDateString(
+      "sv-SE",
+    );
+    return (
+      m.fileName.toLowerCase().includes(q) ||
+      m.fileType.toLowerCase().includes(q) ||
+      date.includes(q)
+    );
+  });
+
   const catMap = new Map((categories ?? []).map((c) => [c.id, c.name]));
+
+  // Filtered lists
+  const filteredCategories = (categories ?? []).filter((c) =>
+    c.name.toLowerCase().includes(catSearch.toLowerCase()),
+  );
+
+  const filteredUsers = (users ?? []).filter((u) =>
+    u.profile.alias.toLowerCase().includes(userSearch.toLowerCase()),
+  );
+
+  const filteredPosts = (posts ?? []).filter((p) => {
+    const q = postSearch.toLowerCase();
+    if (!q) return true;
+    const date = new Date(Number(p.createdAt) / 1_000_000).toLocaleDateString(
+      "sv-SE",
+    );
+    return (
+      p.title.toLowerCase().includes(q) ||
+      p.body.toLowerCase().includes(q) ||
+      p.authorPrincipal.toString().toLowerCase().includes(q) ||
+      date.includes(q)
+    );
+  });
 
   const handleCreateCategory = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -445,6 +672,14 @@ export default function AdminPanel({ onBack }: AdminPanelProps) {
 
           <Tabs defaultValue="categories" className="space-y-6">
             <TabsList className="bg-muted">
+              <TabsTrigger
+                data-ocid="admin.media.tab"
+                value="media"
+                className="gap-1.5"
+              >
+                <Images className="w-3.5 h-3.5" />
+                Media
+              </TabsTrigger>
               <TabsTrigger
                 data-ocid="admin.categories.tab"
                 value="categories"
@@ -525,15 +760,25 @@ export default function AdminPanel({ onBack }: AdminPanelProps) {
               </div>
 
               <div className="bg-card border border-border rounded-xl overflow-hidden shadow-card">
-                <div className="px-6 py-4 border-b border-border">
+                <div className="px-6 py-4 border-b border-border space-y-3">
                   <h2 className="font-semibold text-foreground">
                     Kategorier
                     {categories && (
                       <span className="ml-2 text-muted-foreground font-normal text-sm">
-                        ({categories.length})
+                        ({filteredCategories.length})
                       </span>
                     )}
                   </h2>
+                  <div className="relative">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+                    <Input
+                      data-ocid="admin.categories.search_input"
+                      value={catSearch}
+                      onChange={(e) => setCatSearch(e.target.value)}
+                      placeholder="Sök kategorier…"
+                      className="pl-8 h-8 text-sm"
+                    />
+                  </div>
                 </div>
                 {loadingCats ? (
                   <div
@@ -542,12 +787,14 @@ export default function AdminPanel({ onBack }: AdminPanelProps) {
                   >
                     <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                   </div>
-                ) : !categories || categories.length === 0 ? (
+                ) : filteredCategories.length === 0 ? (
                   <div
                     data-ocid="admin.categories.empty_state"
                     className="py-12 text-center text-muted-foreground text-sm"
                   >
-                    Inga kategorier ännu. Skapa den första ovan.
+                    {catSearch
+                      ? "Inga kategorier matchar sökningen."
+                      : "Inga kategorier ännu. Skapa den första ovan."}
                   </div>
                 ) : (
                   <Table data-ocid="admin.categories.table">
@@ -559,10 +806,11 @@ export default function AdminPanel({ onBack }: AdminPanelProps) {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {categories.map((cat, i) => (
+                      {filteredCategories.map((cat, i) => (
                         <CategoryRow
                           key={cat.id}
                           category={cat}
+                          isHidden={hiddenIdsSet.has(cat.id)}
                           index={i + 1}
                         />
                       ))}
@@ -575,15 +823,25 @@ export default function AdminPanel({ onBack }: AdminPanelProps) {
             {/* ---- ANVÄNDARE ---- */}
             <TabsContent value="users" className="space-y-4">
               <div className="bg-card border border-border rounded-xl overflow-hidden shadow-card">
-                <div className="px-6 py-4 border-b border-border">
+                <div className="px-6 py-4 border-b border-border space-y-3">
                   <h2 className="font-semibold text-foreground">
                     Registrerade användare
                     {users && (
                       <span className="ml-2 text-muted-foreground font-normal text-sm">
-                        ({users.length})
+                        ({filteredUsers.length})
                       </span>
                     )}
                   </h2>
+                  <div className="relative">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+                    <Input
+                      data-ocid="admin.users.search_input"
+                      value={userSearch}
+                      onChange={(e) => setUserSearch(e.target.value)}
+                      placeholder="Sök användare…"
+                      className="pl-8 h-8 text-sm"
+                    />
+                  </div>
                 </div>
                 {loadingUsers ? (
                   <div
@@ -592,12 +850,14 @@ export default function AdminPanel({ onBack }: AdminPanelProps) {
                   >
                     <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                   </div>
-                ) : !users || users.length === 0 ? (
+                ) : filteredUsers.length === 0 ? (
                   <div
                     data-ocid="admin.users.empty_state"
                     className="py-12 text-center text-muted-foreground text-sm"
                   >
-                    Inga registrerade användare ännu.
+                    {userSearch
+                      ? "Inga användare matchar sökningen."
+                      : "Inga registrerade användare ännu."}
                   </div>
                 ) : (
                   <Table data-ocid="admin.users.table">
@@ -610,8 +870,12 @@ export default function AdminPanel({ onBack }: AdminPanelProps) {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {users.map((user, i) => (
-                        <UserRow key={user.alias} user={user} index={i + 1} />
+                      {filteredUsers.map((user, i) => (
+                        <UserRow
+                          key={user.profile.alias}
+                          user={user}
+                          index={i + 1}
+                        />
                       ))}
                     </TableBody>
                   </Table>
@@ -622,15 +886,25 @@ export default function AdminPanel({ onBack }: AdminPanelProps) {
             {/* ---- INLÄGG ---- */}
             <TabsContent value="posts" className="space-y-4">
               <div className="bg-card border border-border rounded-xl overflow-hidden shadow-card">
-                <div className="px-6 py-4 border-b border-border">
+                <div className="px-6 py-4 border-b border-border space-y-3">
                   <h2 className="font-semibold text-foreground">
                     Alla inlägg
                     {posts && (
                       <span className="ml-2 text-muted-foreground font-normal text-sm">
-                        ({posts.length})
+                        ({filteredPosts.length})
                       </span>
                     )}
                   </h2>
+                  <div className="relative">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+                    <Input
+                      data-ocid="admin.posts.search_input"
+                      value={postSearch}
+                      onChange={(e) => setPostSearch(e.target.value)}
+                      placeholder="Sök titel, innehåll, alias, datum…"
+                      className="pl-8 h-8 text-sm"
+                    />
+                  </div>
                 </div>
                 {loadingPosts ? (
                   <div
@@ -639,12 +913,14 @@ export default function AdminPanel({ onBack }: AdminPanelProps) {
                   >
                     <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                   </div>
-                ) : !posts || posts.length === 0 ? (
+                ) : filteredPosts.length === 0 ? (
                   <div
                     data-ocid="admin.posts.empty_state"
                     className="py-12 text-center text-muted-foreground text-sm"
                   >
-                    Inga inlägg ännu.
+                    {postSearch
+                      ? "Inga inlägg matchar sökningen."
+                      : "Inga inlägg ännu."}
                   </div>
                 ) : (
                   <div className="overflow-x-auto">
@@ -659,7 +935,7 @@ export default function AdminPanel({ onBack }: AdminPanelProps) {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {posts.map((post, i) => (
+                        {filteredPosts.map((post, i) => (
                           <AdminPostRow
                             key={post.id}
                             post={post}
@@ -677,7 +953,7 @@ export default function AdminPanel({ onBack }: AdminPanelProps) {
             {/* ---- KOMMENTARER ---- */}
             <TabsContent value="comments" className="space-y-4">
               <div className="bg-card border border-border rounded-xl overflow-hidden shadow-card">
-                <div className="px-6 py-4 border-b border-border">
+                <div className="px-6 py-4 border-b border-border space-y-3">
                   <h2 className="font-semibold text-foreground">
                     Alla kommentarer
                     {allComments && (
@@ -686,10 +962,19 @@ export default function AdminPanel({ onBack }: AdminPanelProps) {
                       </span>
                     )}
                   </h2>
-                  <p className="text-xs text-muted-foreground mt-1">
+                  <p className="text-xs text-muted-foreground">
                     Kommentarer hanteras per inlägg. Gå till ett inlägg för att
                     se och radera kommentarer direkt.
                   </p>
+                  <div className="relative">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+                    <Input
+                      data-ocid="admin.comments.search_input"
+                      disabled
+                      placeholder="Kommentarer hanteras per inlägg"
+                      className="pl-8 h-8 text-sm opacity-50 cursor-not-allowed"
+                    />
+                  </div>
                 </div>
                 {loadingComments ? (
                   <div
@@ -698,7 +983,7 @@ export default function AdminPanel({ onBack }: AdminPanelProps) {
                   >
                     <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                   </div>
-                ) : !allComments || allComments.length === 0 ? (
+                ) : (
                   <div
                     data-ocid="admin.comments.empty_state"
                     className="py-12 text-center text-muted-foreground text-sm"
@@ -706,22 +991,66 @@ export default function AdminPanel({ onBack }: AdminPanelProps) {
                     Kommentarer visas per inlägg. Besök ett inlägg för att
                     hantera dess kommentarer.
                   </div>
+                )}
+              </div>
+            </TabsContent>
+            {/* ---- MEDIA ---- */}
+            <TabsContent value="media" className="space-y-4">
+              <div className="bg-card border border-border rounded-xl overflow-hidden shadow-card">
+                <div className="px-6 py-4 border-b border-border space-y-3">
+                  <h2 className="font-semibold text-foreground">
+                    Alla mediafiler
+                    {allMedia && (
+                      <span className="ml-2 text-muted-foreground font-normal text-sm">
+                        ({allMedia.length})
+                      </span>
+                    )}
+                  </h2>
+                  <div className="relative">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+                    <Input
+                      data-ocid="admin.media.search_input"
+                      value={mediaSearch}
+                      onChange={(e) => setMediaSearch(e.target.value)}
+                      placeholder="Sök filnamn, typ, datum…"
+                      className="pl-8 h-8 text-sm"
+                    />
+                  </div>
+                </div>
+                {loadingMedia ? (
+                  <div
+                    data-ocid="admin.media.loading_state"
+                    className="py-12 flex justify-center"
+                  >
+                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                  </div>
+                ) : filteredMedia.length === 0 ? (
+                  <div
+                    data-ocid="admin.media.empty_state"
+                    className="py-12 text-center text-muted-foreground text-sm"
+                  >
+                    {mediaSearch
+                      ? "Inga mediafiler matchar sökningen."
+                      : "Inga mediafiler uppladdade ännu."}
+                  </div>
                 ) : (
                   <div className="overflow-x-auto">
-                    <Table data-ocid="admin.comments.table">
+                    <Table data-ocid="admin.media.table">
                       <TableHeader>
                         <TableRow>
-                          <TableHead>Kommentar</TableHead>
-                          <TableHead>Författare</TableHead>
-                          <TableHead>Datum</TableHead>
+                          <TableHead>Filnamn</TableHead>
+                          <TableHead>Typ</TableHead>
+                          <TableHead>Storlek</TableHead>
+                          <TableHead>Inlägg/Kommentar</TableHead>
+                          <TableHead>Uppladdad</TableHead>
                           <TableHead className="text-right">Åtgärder</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {allComments.map((comment, i) => (
-                          <AdminCommentRow
-                            key={comment.id}
-                            comment={comment}
+                        {filteredMedia.map((media, i) => (
+                          <MediaRow
+                            key={media.id.toString()}
+                            media={media}
                             index={i + 1}
                           />
                         ))}

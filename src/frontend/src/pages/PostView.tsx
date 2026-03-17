@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useQuery } from "@tanstack/react-query";
 import {
   ArrowLeft,
   BookOpen,
@@ -31,6 +32,9 @@ import { useState } from "react";
 import { toast } from "sonner";
 import AuthorName from "../components/AuthorName";
 import CommentsSection from "../components/CommentsSection";
+import MediaGallery from "../components/MediaGallery";
+import VideoPlayer from "../components/VideoPlayer";
+import { useActor } from "../hooks/useActor";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import {
   useDeletePost,
@@ -41,6 +45,7 @@ import {
   useMyLikedPosts,
   usePinPost,
 } from "../hooks/useQueries";
+import { useStorageClient } from "../hooks/useStorageClient";
 
 interface PostViewProps {
   postId: string;
@@ -65,7 +70,21 @@ export default function PostView({
   const likePost = useLikePost();
   const deletePost = useDeletePost();
   const pinPost = usePinPost();
+  const { actor } = useActor();
+  const storageClient = useStorageClient();
   const [searchInput, setSearchInput] = useState("");
+
+  const { data: postMedia } = useQuery({
+    queryKey: ["postMedia", postId],
+    queryFn: async () => {
+      if (!actor || !post) return [];
+      return actor.getMediaForPost(BigInt(post.id));
+    },
+    enabled: !!actor && !!post,
+  });
+
+  const postImages = (postMedia ?? []).filter((m) => m.fileType === "image");
+  const postVideos = (postMedia ?? []).filter((m) => m.fileType === "video");
 
   const likedSet = new Set(likedPosts ?? []);
   const isLiked = likedSet.has(postId);
@@ -263,6 +282,22 @@ export default function PostView({
               // biome-ignore lint/security/noDangerouslySetInnerHtml: post body is HTML from backend
               dangerouslySetInnerHTML={{ __html: post.body }}
             />
+
+            {/* Post media */}
+            {postImages.length > 0 && (
+              <MediaGallery
+                mediaFiles={postImages}
+                storageClient={storageClient}
+              />
+            )}
+            {postVideos.map((video) => (
+              <VideoPlayer
+                key={video.id.toString()}
+                blobKey={video.blobKey}
+                fileName={video.fileName}
+                storageClient={storageClient}
+              />
+            ))}
 
             <Separator className="mt-10 mb-6" />
 

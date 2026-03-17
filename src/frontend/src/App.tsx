@@ -11,6 +11,7 @@ import FeedPage from "./pages/FeedPage";
 import LoginPage from "./pages/LoginPage";
 import PostForm from "./pages/PostForm";
 import PostView from "./pages/PostView";
+import ProfilePage from "./pages/ProfilePage";
 import RegisterPage from "./pages/RegisterPage";
 import SearchPage from "./pages/SearchPage";
 
@@ -20,7 +21,8 @@ type View =
   | { name: "create-post" }
   | { name: "edit-post"; postId: string }
   | { name: "admin" }
-  | { name: "search"; query: string };
+  | { name: "search"; query: string }
+  | { name: "profile" };
 
 const LOADING_TIMEOUT_MS = 15_000;
 
@@ -56,7 +58,6 @@ function AppShell() {
 
   if (isLoading) {
     if (timedOut) {
-      // Loading took too long -- offer the user an escape hatch.
       return (
         <div className="min-h-screen bg-background flex flex-col">
           <div className="h-1 bg-primary w-full" />
@@ -119,6 +120,16 @@ function AppShell() {
   if (!identity) return <LoginPage />;
   if (!profile) return <RegisterPage />;
 
+  if (view.name === "profile") {
+    return (
+      <ProfilePage
+        profile={profile}
+        onBack={() => setView({ name: "feed" })}
+        onLogout={clear}
+      />
+    );
+  }
+
   if (view.name === "admin") {
     return <AdminPanel onBack={() => setView({ name: "feed" })} />;
   }
@@ -178,6 +189,7 @@ function AppShell() {
       onCreatePost={() => setView({ name: "create-post" })}
       onAdminPanel={() => setView({ name: "admin" })}
       onSearch={(query) => setView({ name: "search", query })}
+      onProfile={() => setView({ name: "profile" })}
     />
   );
 }

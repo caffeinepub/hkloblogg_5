@@ -16,6 +16,26 @@ export interface Category {
   'createdAt' : Time,
   'createdBy' : Principal,
 }
+export interface Comment {
+  'id' : string,
+  'likeCount' : bigint,
+  'body' : string,
+  'createdAt' : Time,
+  'parentId' : [] | [string],
+  'authorPrincipal' : Principal,
+  'postId' : string,
+}
+export interface MediaFile {
+  'id' : bigint,
+  'commentId' : [] | [bigint],
+  'ownerId' : Principal,
+  'blobKey' : string,
+  'fileName' : string,
+  'fileSize' : bigint,
+  'fileType' : string,
+  'uploadedAt' : bigint,
+  'postId' : [] | [bigint],
+}
 export interface Post {
   'id' : string,
   'categoryId' : string,
@@ -27,6 +47,10 @@ export interface Post {
   'pinned' : boolean,
   'authorPrincipal' : Principal,
 }
+export interface SearchResult {
+  'comments' : Array<Comment>,
+  'posts' : Array<Post>,
+}
 export type Time = bigint;
 export interface UserProfile {
   'alias' : string,
@@ -37,30 +61,78 @@ export interface UserProfile {
 export type UserRole = { 'admin' : null } |
   { 'user' : null } |
   { 'guest' : null };
+export interface UserWithPrincipal {
+  'principal' : Principal,
+  'profile' : UserProfile,
+}
+export interface _CaffeineStorageCreateCertificateResult {
+  'method' : string,
+  'blob_hash' : string,
+}
+export interface _CaffeineStorageRefillInformation {
+  'proposed_top_up_amount' : [] | [bigint],
+}
+export interface _CaffeineStorageRefillResult {
+  'success' : [] | [boolean],
+  'topped_up_amount' : [] | [bigint],
+}
 export interface _SERVICE {
+  '_caffeineStorageBlobIsLive' : ActorMethod<[Uint8Array], boolean>,
+  '_caffeineStorageBlobsToDelete' : ActorMethod<[], Array<Uint8Array>>,
+  '_caffeineStorageConfirmBlobDeletion' : ActorMethod<
+    [Array<Uint8Array>],
+    undefined
+  >,
+  '_caffeineStorageCreateCertificate' : ActorMethod<
+    [string],
+    _CaffeineStorageCreateCertificateResult
+  >,
+  '_caffeineStorageRefillCashier' : ActorMethod<
+    [[] | [_CaffeineStorageRefillInformation]],
+    _CaffeineStorageRefillResult
+  >,
+  '_caffeineStorageUpdateGatewayPrincipals' : ActorMethod<[], undefined>,
   '_initializeAccessControlWithSecret' : ActorMethod<[string], undefined>,
   'assignCallerUserRole' : ActorMethod<[Principal, UserRole], undefined>,
   'blockUser' : ActorMethod<[Principal], undefined>,
   'createCategory' : ActorMethod<[string], undefined>,
+  'createComment' : ActorMethod<[string, string, [] | [string]], undefined>,
   'createPost' : ActorMethod<[string, string, string], undefined>,
   'deleteCategory' : ActorMethod<[string], undefined>,
+  'deleteComment' : ActorMethod<[string], undefined>,
+  'deleteMedia' : ActorMethod<[bigint], undefined>,
+  'deleteMyAccount' : ActorMethod<[], undefined>,
   'deletePost' : ActorMethod<[string], undefined>,
+  'deleteUser' : ActorMethod<[Principal], undefined>,
+  'editComment' : ActorMethod<[string, string], undefined>,
   'editPost' : ActorMethod<[string, string, string, string], undefined>,
+  'getAllMedia' : ActorMethod<[], Array<MediaFile>>,
   'getCallerUserRole' : ActorMethod<[], UserRole>,
+  'getMediaForComment' : ActorMethod<[bigint], Array<MediaFile>>,
+  'getMediaForPost' : ActorMethod<[bigint], Array<MediaFile>>,
+  'getMyLikedComments' : ActorMethod<[], Array<string>>,
   'getMyLikedPosts' : ActorMethod<[], Array<string>>,
   'getMyProfile' : ActorMethod<[], [] | [UserProfile]>,
   'getPost' : ActorMethod<[string], [] | [Post]>,
   'getUser' : ActorMethod<[Principal], [] | [UserProfile]>,
   'isCallerAdmin' : ActorMethod<[], boolean>,
+  'likeComment' : ActorMethod<[string], undefined>,
   'likePost' : ActorMethod<[string], undefined>,
   'listCategories' : ActorMethod<[], Array<Category>>,
+  'listComments' : ActorMethod<[string], Array<Comment>>,
   'listPosts' : ActorMethod<[[] | [string]], Array<Post>>,
   'listPostsByAuthor' : ActorMethod<[string], Array<Post>>,
   'listUsers' : ActorMethod<[], Array<UserProfile>>,
+  'listUsersWithPrincipal' : ActorMethod<[], Array<UserWithPrincipal>>,
   'pinPost' : ActorMethod<[string, boolean], undefined>,
   'register' : ActorMethod<[string], undefined>,
+  'search' : ActorMethod<[string], SearchResult>,
   'setRole' : ActorMethod<[Principal, UserRole], undefined>,
   'unblockUser' : ActorMethod<[Principal], undefined>,
+  'uploadMedia' : ActorMethod<
+    [[] | [bigint], [] | [bigint], string, string, bigint, string],
+    bigint
+  >,
 }
 export declare const idlService: IDL.ServiceClass;
 export declare const idlInitArgs: IDL.Type[];

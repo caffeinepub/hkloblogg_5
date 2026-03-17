@@ -27,18 +27,11 @@ export function useActor() {
 
       const actor = await createActorWithConfig(actorOptions);
       const adminToken = getSecretParameter("caffeineAdminToken") || "";
-      // Non-critical initialization -- wrap in try/catch so a failure
-      // doesn't leave the app permanently stuck in the loading skeleton.
-      try {
-        await actor._initializeAccessControlWithSecret(adminToken);
-      } catch {
-        // Proceed without admin initialization; the actor is still usable.
-      }
+      await actor._initializeAccessControlWithSecret(adminToken);
       return actor;
     },
     // Only refetch when identity changes
     staleTime: Number.POSITIVE_INFINITY,
-    retry: 1,
     // This will cause the actor to be recreated when the identity changes
     enabled: true,
   });

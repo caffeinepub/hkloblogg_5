@@ -8,10 +8,32 @@
 
 import { IDL } from '@icp-sdk/core/candid';
 
+export const _CaffeineStorageCreateCertificateResult = IDL.Record({
+  'method' : IDL.Text,
+  'blob_hash' : IDL.Text,
+});
+export const _CaffeineStorageRefillInformation = IDL.Record({
+  'proposed_top_up_amount' : IDL.Opt(IDL.Nat),
+});
+export const _CaffeineStorageRefillResult = IDL.Record({
+  'success' : IDL.Opt(IDL.Bool),
+  'topped_up_amount' : IDL.Opt(IDL.Nat),
+});
 export const UserRole = IDL.Variant({
   'admin' : IDL.Null,
   'user' : IDL.Null,
   'guest' : IDL.Null,
+});
+export const MediaFile = IDL.Record({
+  'id' : IDL.Nat,
+  'commentId' : IDL.Opt(IDL.Nat),
+  'ownerId' : IDL.Principal,
+  'blobKey' : IDL.Text,
+  'fileName' : IDL.Text,
+  'fileSize' : IDL.Nat,
+  'fileType' : IDL.Text,
+  'uploadedAt' : IDL.Int,
+  'postId' : IDL.Opt(IDL.Nat),
 });
 export const Time = IDL.Int;
 export const UserProfile = IDL.Record({
@@ -37,40 +59,135 @@ export const Category = IDL.Record({
   'createdAt' : Time,
   'createdBy' : IDL.Principal,
 });
+export const Comment = IDL.Record({
+  'id' : IDL.Text,
+  'likeCount' : IDL.Nat,
+  'body' : IDL.Text,
+  'createdAt' : Time,
+  'parentId' : IDL.Opt(IDL.Text),
+  'authorPrincipal' : IDL.Principal,
+  'postId' : IDL.Text,
+});
+export const UserWithPrincipal = IDL.Record({
+  'principal' : IDL.Principal,
+  'profile' : UserProfile,
+});
+export const SearchResult = IDL.Record({
+  'comments' : IDL.Vec(Comment),
+  'posts' : IDL.Vec(Post),
+});
 
 export const idlService = IDL.Service({
+  '_caffeineStorageBlobIsLive' : IDL.Func(
+      [IDL.Vec(IDL.Nat8)],
+      [IDL.Bool],
+      ['query'],
+    ),
+  '_caffeineStorageBlobsToDelete' : IDL.Func(
+      [],
+      [IDL.Vec(IDL.Vec(IDL.Nat8))],
+      ['query'],
+    ),
+  '_caffeineStorageConfirmBlobDeletion' : IDL.Func(
+      [IDL.Vec(IDL.Vec(IDL.Nat8))],
+      [],
+      [],
+    ),
+  '_caffeineStorageCreateCertificate' : IDL.Func(
+      [IDL.Text],
+      [_CaffeineStorageCreateCertificateResult],
+      [],
+    ),
+  '_caffeineStorageRefillCashier' : IDL.Func(
+      [IDL.Opt(_CaffeineStorageRefillInformation)],
+      [_CaffeineStorageRefillResult],
+      [],
+    ),
+  '_caffeineStorageUpdateGatewayPrincipals' : IDL.Func([], [], []),
   '_initializeAccessControlWithSecret' : IDL.Func([IDL.Text], [], []),
   'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
   'blockUser' : IDL.Func([IDL.Principal], [], []),
   'createCategory' : IDL.Func([IDL.Text], [], []),
+  'createComment' : IDL.Func([IDL.Text, IDL.Text, IDL.Opt(IDL.Text)], [], []),
   'createPost' : IDL.Func([IDL.Text, IDL.Text, IDL.Text], [], []),
   'deleteCategory' : IDL.Func([IDL.Text], [], []),
+  'deleteComment' : IDL.Func([IDL.Text], [], []),
+  'deleteMedia' : IDL.Func([IDL.Nat], [], []),
+  'deleteMyAccount' : IDL.Func([], [], []),
   'deletePost' : IDL.Func([IDL.Text], [], []),
+  'deleteUser' : IDL.Func([IDL.Principal], [], []),
+  'editComment' : IDL.Func([IDL.Text, IDL.Text], [], []),
   'editPost' : IDL.Func([IDL.Text, IDL.Text, IDL.Text, IDL.Text], [], []),
+  'getAllMedia' : IDL.Func([], [IDL.Vec(MediaFile)], ['query']),
   'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
+  'getMediaForComment' : IDL.Func([IDL.Nat], [IDL.Vec(MediaFile)], ['query']),
+  'getMediaForPost' : IDL.Func([IDL.Nat], [IDL.Vec(MediaFile)], ['query']),
+  'getMyLikedComments' : IDL.Func([], [IDL.Vec(IDL.Text)], ['query']),
   'getMyLikedPosts' : IDL.Func([], [IDL.Vec(IDL.Text)], ['query']),
   'getMyProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
   'getPost' : IDL.Func([IDL.Text], [IDL.Opt(Post)], ['query']),
   'getUser' : IDL.Func([IDL.Principal], [IDL.Opt(UserProfile)], ['query']),
   'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
+  'likeComment' : IDL.Func([IDL.Text], [], []),
   'likePost' : IDL.Func([IDL.Text], [], []),
   'listCategories' : IDL.Func([], [IDL.Vec(Category)], ['query']),
+  'listComments' : IDL.Func([IDL.Text], [IDL.Vec(Comment)], ['query']),
   'listPosts' : IDL.Func([IDL.Opt(IDL.Text)], [IDL.Vec(Post)], ['query']),
   'listPostsByAuthor' : IDL.Func([IDL.Text], [IDL.Vec(Post)], ['query']),
   'listUsers' : IDL.Func([], [IDL.Vec(UserProfile)], ['query']),
+  'listUsersWithPrincipal' : IDL.Func(
+      [],
+      [IDL.Vec(UserWithPrincipal)],
+      ['query'],
+    ),
   'pinPost' : IDL.Func([IDL.Text, IDL.Bool], [], []),
   'register' : IDL.Func([IDL.Text], [], []),
+  'search' : IDL.Func([IDL.Text], [SearchResult], ['query']),
   'setRole' : IDL.Func([IDL.Principal, UserRole], [], []),
   'unblockUser' : IDL.Func([IDL.Principal], [], []),
+  'uploadMedia' : IDL.Func(
+      [
+        IDL.Opt(IDL.Nat),
+        IDL.Opt(IDL.Nat),
+        IDL.Text,
+        IDL.Text,
+        IDL.Nat,
+        IDL.Text,
+      ],
+      [IDL.Nat],
+      [],
+    ),
 });
 
 export const idlInitArgs = [];
 
 export const idlFactory = ({ IDL }) => {
+  const _CaffeineStorageCreateCertificateResult = IDL.Record({
+    'method' : IDL.Text,
+    'blob_hash' : IDL.Text,
+  });
+  const _CaffeineStorageRefillInformation = IDL.Record({
+    'proposed_top_up_amount' : IDL.Opt(IDL.Nat),
+  });
+  const _CaffeineStorageRefillResult = IDL.Record({
+    'success' : IDL.Opt(IDL.Bool),
+    'topped_up_amount' : IDL.Opt(IDL.Nat),
+  });
   const UserRole = IDL.Variant({
     'admin' : IDL.Null,
     'user' : IDL.Null,
     'guest' : IDL.Null,
+  });
+  const MediaFile = IDL.Record({
+    'id' : IDL.Nat,
+    'commentId' : IDL.Opt(IDL.Nat),
+    'ownerId' : IDL.Principal,
+    'blobKey' : IDL.Text,
+    'fileName' : IDL.Text,
+    'fileSize' : IDL.Nat,
+    'fileType' : IDL.Text,
+    'uploadedAt' : IDL.Int,
+    'postId' : IDL.Opt(IDL.Nat),
   });
   const Time = IDL.Int;
   const UserProfile = IDL.Record({
@@ -96,31 +213,104 @@ export const idlFactory = ({ IDL }) => {
     'createdAt' : Time,
     'createdBy' : IDL.Principal,
   });
+  const Comment = IDL.Record({
+    'id' : IDL.Text,
+    'likeCount' : IDL.Nat,
+    'body' : IDL.Text,
+    'createdAt' : Time,
+    'parentId' : IDL.Opt(IDL.Text),
+    'authorPrincipal' : IDL.Principal,
+    'postId' : IDL.Text,
+  });
+  const UserWithPrincipal = IDL.Record({
+    'principal' : IDL.Principal,
+    'profile' : UserProfile,
+  });
+  const SearchResult = IDL.Record({
+    'comments' : IDL.Vec(Comment),
+    'posts' : IDL.Vec(Post),
+  });
   
   return IDL.Service({
+    '_caffeineStorageBlobIsLive' : IDL.Func(
+        [IDL.Vec(IDL.Nat8)],
+        [IDL.Bool],
+        ['query'],
+      ),
+    '_caffeineStorageBlobsToDelete' : IDL.Func(
+        [],
+        [IDL.Vec(IDL.Vec(IDL.Nat8))],
+        ['query'],
+      ),
+    '_caffeineStorageConfirmBlobDeletion' : IDL.Func(
+        [IDL.Vec(IDL.Vec(IDL.Nat8))],
+        [],
+        [],
+      ),
+    '_caffeineStorageCreateCertificate' : IDL.Func(
+        [IDL.Text],
+        [_CaffeineStorageCreateCertificateResult],
+        [],
+      ),
+    '_caffeineStorageRefillCashier' : IDL.Func(
+        [IDL.Opt(_CaffeineStorageRefillInformation)],
+        [_CaffeineStorageRefillResult],
+        [],
+      ),
+    '_caffeineStorageUpdateGatewayPrincipals' : IDL.Func([], [], []),
     '_initializeAccessControlWithSecret' : IDL.Func([IDL.Text], [], []),
     'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
     'blockUser' : IDL.Func([IDL.Principal], [], []),
     'createCategory' : IDL.Func([IDL.Text], [], []),
+    'createComment' : IDL.Func([IDL.Text, IDL.Text, IDL.Opt(IDL.Text)], [], []),
     'createPost' : IDL.Func([IDL.Text, IDL.Text, IDL.Text], [], []),
     'deleteCategory' : IDL.Func([IDL.Text], [], []),
+    'deleteComment' : IDL.Func([IDL.Text], [], []),
+    'deleteMedia' : IDL.Func([IDL.Nat], [], []),
+    'deleteMyAccount' : IDL.Func([], [], []),
     'deletePost' : IDL.Func([IDL.Text], [], []),
+    'deleteUser' : IDL.Func([IDL.Principal], [], []),
+    'editComment' : IDL.Func([IDL.Text, IDL.Text], [], []),
     'editPost' : IDL.Func([IDL.Text, IDL.Text, IDL.Text, IDL.Text], [], []),
+    'getAllMedia' : IDL.Func([], [IDL.Vec(MediaFile)], ['query']),
     'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
+    'getMediaForComment' : IDL.Func([IDL.Nat], [IDL.Vec(MediaFile)], ['query']),
+    'getMediaForPost' : IDL.Func([IDL.Nat], [IDL.Vec(MediaFile)], ['query']),
+    'getMyLikedComments' : IDL.Func([], [IDL.Vec(IDL.Text)], ['query']),
     'getMyLikedPosts' : IDL.Func([], [IDL.Vec(IDL.Text)], ['query']),
     'getMyProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
     'getPost' : IDL.Func([IDL.Text], [IDL.Opt(Post)], ['query']),
     'getUser' : IDL.Func([IDL.Principal], [IDL.Opt(UserProfile)], ['query']),
     'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
+    'likeComment' : IDL.Func([IDL.Text], [], []),
     'likePost' : IDL.Func([IDL.Text], [], []),
     'listCategories' : IDL.Func([], [IDL.Vec(Category)], ['query']),
+    'listComments' : IDL.Func([IDL.Text], [IDL.Vec(Comment)], ['query']),
     'listPosts' : IDL.Func([IDL.Opt(IDL.Text)], [IDL.Vec(Post)], ['query']),
     'listPostsByAuthor' : IDL.Func([IDL.Text], [IDL.Vec(Post)], ['query']),
     'listUsers' : IDL.Func([], [IDL.Vec(UserProfile)], ['query']),
+    'listUsersWithPrincipal' : IDL.Func(
+        [],
+        [IDL.Vec(UserWithPrincipal)],
+        ['query'],
+      ),
     'pinPost' : IDL.Func([IDL.Text, IDL.Bool], [], []),
     'register' : IDL.Func([IDL.Text], [], []),
+    'search' : IDL.Func([IDL.Text], [SearchResult], ['query']),
     'setRole' : IDL.Func([IDL.Principal, UserRole], [], []),
     'unblockUser' : IDL.Func([IDL.Principal], [], []),
+    'uploadMedia' : IDL.Func(
+        [
+          IDL.Opt(IDL.Nat),
+          IDL.Opt(IDL.Nat),
+          IDL.Text,
+          IDL.Text,
+          IDL.Nat,
+          IDL.Text,
+        ],
+        [IDL.Nat],
+        [],
+      ),
   });
 };
 

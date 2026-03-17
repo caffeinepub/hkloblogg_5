@@ -13,8 +13,14 @@ import { ArrowLeft, BookOpen, Loader2, Shield } from "lucide-react";
 import { motion } from "motion/react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import MediaUploader, {
+  type StagedFile,
+  compressImage,
+} from "../components/MediaUploader";
 import RichEditor from "../components/RichEditor";
+import { useActor } from "../hooks/useActor";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
+import { useMediaUpload } from "../hooks/useMediaUpload";
 import {
   useCreatePost,
   useEditPost,
@@ -42,16 +48,19 @@ export default function PostForm({
   onSuccess,
   onAdminPanel,
 }: PostFormProps) {
-  const { clear } = useInternetIdentity();
+  const { clear, identity } = useInternetIdentity();
   const { data: isAdmin } = useIsAdmin();
   const { data: categories } = useListCategories();
   const { data: existingPost } = useGetPost(postId ?? null);
   const createPost = useCreatePost();
   const editPost = useEditPost();
+  const { actor } = useActor();
+  const { uploadFiles, uploading, progress } = useMediaUpload();
 
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [categoryId, setCategoryId] = useState("");
+  const [stagedFiles, setStagedFiles] = useState<StagedFile[]>([]);
   const [errors, setErrors] = useState<{
     title?: string;
     body?: string;
@@ -99,6 +108,45 @@ export default function PostForm({
           body,
           categoryId,
         });
+
+        // Upload media if any staged files (find new post after creation)
+        const validFiles = stagedFiles.filter((sf) => !sf.error);
+        if (validFiles.length > 0 && actor) {
+          try {
+            // Get the newly created post by finding the most recent post by this user
+            const allPosts = await actor.listPosts(null);
+            const myPrincipal = identity?.getPrincipal().toString();
+            const newPost = allPosts
+              .filter(
+                (p) =>
+                  p.title === title.trim() &&
+                  p.authorPrincipal.toString() === myPrincipal,
+              )
+              .sort((a, b) => Number(b.createdAt) - Number(a.createdAt))[0];
+
+            if (newPost) {
+              const filesToUpload = await Promise.all(
+                validFiles.map(async (sf) => {
+                  if (sf.compress && sf.file.type.startsWith("image/")) {
+                    try {
+                      return await compressImage(sf.file);
+                    } catch {
+                      return sf.file;
+                    }
+                  }
+                  return sf.file;
+                }),
+              );
+              await uploadFiles(filesToUpload, BigInt(newPost.id), null);
+            }
+          } catch {
+            // Media upload failed but post was created - show warning
+            toast.warning(
+              "Inlägget publicerades men media kunde inte laddas upp.",
+            );
+          }
+        }
+
         toast.success("Inlägget publicerades!");
         onSuccess("");
       } else if (postId) {
@@ -108,6 +156,31 @@ export default function PostForm({
           body,
           categoryId,
         });
+
+        // Upload any new media
+        const validFiles = stagedFiles.filter((sf) => !sf.error);
+        if (validFiles.length > 0) {
+          try {
+            const filesToUpload = await Promise.all(
+              validFiles.map(async (sf) => {
+                if (sf.compress && sf.file.type.startsWith("image/")) {
+                  try {
+                    return await compressImage(sf.file);
+                  } catch {
+                    return sf.file;
+                  }
+                }
+                return sf.file;
+              }),
+            );
+            await uploadFiles(filesToUpload, BigInt(postId), null);
+          } catch {
+            toast.warning(
+              "Ändringarna sparades men media kunde inte laddas upp.",
+            );
+          }
+        }
+
         toast.success("Ändringarna sparades!");
         onSuccess(postId);
       }
@@ -120,7 +193,7 @@ export default function PostForm({
     }
   };
 
-  const isPending = createPost.isPending || editPost.isPending;
+  const isPending = createPost.isPending || editPost.isPending || uploading;
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -270,6 +343,18 @@ export default function PostForm({
                   {errors.body}
                 </p>
               )}
+            </div>
+
+            {/* Media uploader */}
+            <div className="space-y-2">
+              <Label className="text-foreground font-medium">Media</Label>
+              <MediaUploader
+                stagedFiles={stagedFiles}
+                onFilesChange={setStagedFiles}
+                uploading={uploading}
+                progress={progress}
+                disabled={isPending}
+              />
             </div>
 
             {/* Submit */}

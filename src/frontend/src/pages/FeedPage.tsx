@@ -10,6 +10,7 @@ import {
   Pin,
   Search,
   Shield,
+  User,
 } from "lucide-react";
 import { motion } from "motion/react";
 import { useState } from "react";
@@ -29,6 +30,7 @@ interface FeedPageProps {
   onCreatePost: () => void;
   onAdminPanel: () => void;
   onSearch: (query: string) => void;
+  onProfile: () => void;
 }
 
 function PostCard({
@@ -106,6 +108,7 @@ export default function FeedPage({
   onCreatePost,
   onAdminPanel,
   onSearch,
+  onProfile,
 }: FeedPageProps) {
   const { clear } = useInternetIdentity();
   const { data: profile } = useMyProfile();
@@ -162,9 +165,15 @@ export default function FeedPage({
               </div>
             </form>
             {profile && (
-              <span className="text-sm text-muted-foreground hidden sm:block">
-                {profile.alias}
-              </span>
+              <button
+                type="button"
+                data-ocid="feed.profile.button"
+                onClick={onProfile}
+                className="hidden sm:flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors px-2 py-1 rounded-md hover:bg-muted"
+              >
+                <User className="w-3.5 h-3.5" />
+                <span>{profile.alias}</span>
+              </button>
             )}
             {isAdmin && (
               <Button

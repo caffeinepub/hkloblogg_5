@@ -8,6 +8,7 @@ import type {
   SearchResult,
   UserProfile,
   UserRole,
+  UserWithPrincipal,
 } from "../backend.d";
 import { useActor } from "./useActor";
 
@@ -53,15 +54,83 @@ export function useListUsers() {
   });
 }
 
+export function useListUsersWithPrincipal() {
+  const { actor, isFetching } = useActor();
+  return useQuery<UserWithPrincipal[]>({
+    queryKey: ["users"],
+    queryFn: async () => {
+      if (!actor) return [];
+      return fullActor(actor).listUsersWithPrincipal();
+    },
+    enabled: !!actor && !isFetching,
+  });
+}
+
+export function useDeleteUser() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (principal: Principal) => {
+      if (!actor) throw new Error("Inte inloggad");
+      return fullActor(actor).deleteUser(principal);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["users"] });
+      queryClient.invalidateQueries({ queryKey: ["posts"] });
+    },
+  });
+}
+
+export function useDeleteMyAccount() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      if (!actor) throw new Error("Inte inloggad");
+      return fullActor(actor).deleteMyAccount();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["myProfile"] });
+    },
+  });
+}
+
 export function useListCategories() {
   const { actor, isFetching } = useActor();
   return useQuery<Category[]>({
     queryKey: ["categories"],
     queryFn: async () => {
       if (!actor) return [];
-      return actor.listCategories();
+      return fullActor(actor).listCategories();
     },
     enabled: !!actor && !isFetching,
+  });
+}
+
+export function useGetHiddenCategoryIds() {
+  const { actor, isFetching } = useActor();
+  return useQuery<string[]>({
+    queryKey: ["hiddenCategoryIds"],
+    queryFn: async () => {
+      if (!actor) return [];
+      return fullActor(actor).getHiddenCategoryIds();
+    },
+    enabled: !!actor && !isFetching,
+  });
+}
+
+export function useToggleCategoryHidden() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, hidden }: { id: string; hidden: boolean }) => {
+      if (!actor) throw new Error("Inte inloggad");
+      return fullActor(actor).toggleCategoryHidden(id, hidden);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["categories"] });
+      queryClient.invalidateQueries({ queryKey: ["hiddenCategoryIds"] });
+    },
   });
 }
 
@@ -189,6 +258,7 @@ export function useDeleteCategory() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["categories"] });
+      queryClient.invalidateQueries({ queryKey: ["hiddenCategoryIds"] });
     },
   });
 }
