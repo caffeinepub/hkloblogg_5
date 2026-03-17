@@ -73,6 +73,9 @@ export interface backendInterface {
     deleteCategory(id: string): Promise<void>;
     toggleCategoryHidden(id: string, hidden: boolean): Promise<void>;
     getHiddenCategoryIds(): Promise<Array<string>>;
+    addUserToCategoryAllowedList(categoryId: string, user: Principal): Promise<void>;
+    removeUserFromCategoryAllowedList(categoryId: string, user: Principal): Promise<void>;
+    getCategoryAllowedUsers(categoryId: string): Promise<Array<Principal>>;
     deleteComment(commentId: string): Promise<void>;
     deleteMedia(mediaId: bigint): Promise<void>;
     deleteMyAccount(): Promise<void>;

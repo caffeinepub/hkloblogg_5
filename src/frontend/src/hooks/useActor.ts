@@ -26,24 +26,13 @@ export function useActor() {
       };
 
       const actor = await createActorWithConfig(actorOptions);
-      // Wrap in try/catch so a failure here never prevents the actor from being returned.
-      // This call only succeeds for admin users with the correct token.
-      try {
-        const adminToken = getSecretParameter("caffeineAdminToken") || "";
-        const timeoutPromise = new Promise<void>((_, reject) =>
-          setTimeout(() => reject(new Error("timeout")), 8000),
-        );
-        await Promise.race([
-          actor._initializeAccessControlWithSecret(adminToken),
-          timeoutPromise,
-        ]);
-      } catch {
-        // Silently ignore – non-admin users will always fail this call
-      }
+      const adminToken = getSecretParameter("caffeineAdminToken") || "";
+      await actor._initializeAccessControlWithSecret(adminToken);
       return actor;
     },
     // Only refetch when identity changes
     staleTime: Number.POSITIVE_INFINITY,
+    // This will cause the actor to be recreated when the identity changes
     enabled: true,
   });
 

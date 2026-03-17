@@ -70,7 +70,7 @@ actor {
     fileType : Text;
     fileName : Text;
     fileSize : Nat;
-    blobKey : Text; // Storage.ExternalBlob reference
+    blobKey : Text;
     uploadedAt : Int;
   };
 
@@ -80,6 +80,7 @@ actor {
   let userProfiles = Map.empty<Principal, UserProfile>();
   let categories = Map.empty<Text, Category>();
   let categoryHidden = Map.empty<Text, Bool>();
+  let categoryAllowedUsers = Map.empty<Text, List.List<Principal>>();
   var posts = Map.empty<Text, Post>();
   var postLikes = Map.empty<Text, List.List<Principal>>();
   var comments = Map.empty<Text, Comment>();
@@ -151,6 +152,12 @@ actor {
       let filtered = likes.filter(func(p) { p != user });
       commentLikes.add(commentId, filtered);
     };
+
+    // Remove user from all category allowed lists
+    for ((catId, allowedList) in categoryAllowedUsers.entries()) {
+      let filtered = allowedList.filter(func(p) { p != user });
+      categoryAllowedUsers.add(catId, filtered);
+    };
   };
 
   public query ({ caller }) func getMyProfile() : async ?UserProfile {
@@ -202,9 +209,15 @@ actor {
       categories.values().toArray();
     } else {
       categories.values().filter(func(c) {
-        switch (categoryHidden.get(c.id)) {
-          case (?true) { false };
-          case (_) { true };
+        let isHidden = switch (categoryHidden.get(c.id)) {
+          case (?true) { true };
+          case (_) { false };
+        };
+        if (not isHidden) { return true };
+        // Hidden -- check if caller is in allowedUsers
+        switch (categoryAllowedUsers.get(c.id)) {
+          case (null) { false };
+          case (?allowedList) { allowedList.any(func(p) { p == caller }) };
         };
       }).toArray();
     };
@@ -332,6 +345,8 @@ actor {
     };
 
     categories.remove(id);
+    categoryHidden.remove(id);
+    categoryAllowedUsers.remove(id);
   };
 
   public shared ({ caller }) func toggleCategoryHidden(id : Text, hidden : Bool) : async () {
@@ -355,6 +370,60 @@ actor {
       Runtime.trap("Unauthorized: Only superadmin can view hidden categories");
     };
     categoryHidden.keys().toArray();
+  };
+
+  public shared ({ caller }) func addUserToCategoryAllowedList(categoryId : Text, user : Principal) : async () {
+    if (not (AccessControl.isAdmin(accessControlState, caller))) {
+      Runtime.trap("Unauthorized: Only superadmin can manage category access");
+    };
+
+    if (not categories.containsKey(categoryId)) {
+      Runtime.trap("Category not found");
+    };
+
+    let existingList = switch (categoryAllowedUsers.get(categoryId)) {
+      case (null) { List.empty<Principal>() };
+      case (?list) { list };
+    };
+
+    let alreadyAdded = existingList.any(func(p) { p == user });
+    if (not alreadyAdded) {
+      existingList.add(user);
+      categoryAllowedUsers.add(categoryId, existingList);
+    };
+  };
+
+  public shared ({ caller }) func removeUserFromCategoryAllowedList(categoryId : Text, user : Principal) : async () {
+    if (not (AccessControl.isAdmin(accessControlState, caller))) {
+      Runtime.trap("Unauthorized: Only superadmin can manage category access");
+    };
+
+    if (not categories.containsKey(categoryId)) {
+      Runtime.trap("Category not found");
+    };
+
+    switch (categoryAllowedUsers.get(categoryId)) {
+      case (null) {};
+      case (?list) {
+        let filtered = list.filter(func(p) { p != user });
+        categoryAllowedUsers.add(categoryId, filtered);
+      };
+    };
+  };
+
+  public query ({ caller }) func getCategoryAllowedUsers(categoryId : Text) : async [Principal] {
+    if (not (AccessControl.isAdmin(accessControlState, caller))) {
+      Runtime.trap("Unauthorized: Only superadmin can view category access lists");
+    };
+
+    if (not categories.containsKey(categoryId)) {
+      Runtime.trap("Category not found");
+    };
+
+    switch (categoryAllowedUsers.get(categoryId)) {
+      case (null) { [] };
+      case (?list) { list.toArray() };
+    };
   };
 
   public shared ({ caller }) func createPost(title : Text, body : Text, categoryId : Text) : async () {

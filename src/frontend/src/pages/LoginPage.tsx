@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { BookOpen, Loader2 } from "lucide-react";
+import { BookOpen, Loader2, ShieldCheck } from "lucide-react";
 import { motion } from "motion/react";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
 
@@ -11,7 +11,7 @@ export default function LoginPage() {
       {/* Decorative top bar */}
       <div className="h-1 bg-primary w-full" />
 
-      <main className="flex-1 flex flex-col items-center justify-center px-4">
+      <main className="flex-1 flex flex-col items-center justify-center px-4 py-10">
         <motion.div
           initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
@@ -19,7 +19,7 @@ export default function LoginPage() {
           className="w-full max-w-sm"
         >
           {/* Logo + title */}
-          <div className="text-center mb-10">
+          <div className="text-center mb-6">
             <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-primary/10 mb-5">
               <BookOpen className="w-7 h-7 text-primary" strokeWidth={1.5} />
             </div>
@@ -27,7 +27,11 @@ export default function LoginPage() {
               HKLOblogg
             </h1>
             <p className="text-muted-foreground text-sm">
-              En plats för tankar och berättelser
+              En plattform för åsiktsfrihet, yttrandefrihet och respektfull
+              dialog
+            </p>
+            <p className="text-muted-foreground text-xs mt-1">
+              – med fokus på integritet och GDPR
             </p>
           </div>
 
@@ -56,6 +60,35 @@ export default function LoginPage() {
               )}
             </Button>
           </div>
+
+          {/* GDPR clarification */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.3, duration: 0.5 }}
+            className="mt-5 bg-muted/50 border border-border rounded-xl p-5"
+          >
+            <div className="flex items-center gap-2 mb-2">
+              <ShieldCheck className="w-4 h-4 text-primary flex-shrink-0" />
+              <span className="text-xs font-semibold text-foreground uppercase tracking-wide">
+                Förtydligande – Rätten att bli glömd
+              </span>
+            </div>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Du har rätt att bli glömd – Du kan själv radera ditt konto, och
+              alla dina inlägg och kommentarer kommer att tas bort från
+              HKLO-bloggens synliga gränssnitt. Observera dock att eftersom
+              innehållet lagras på{" "}
+              <strong className="text-foreground">
+                Internet Computer Protocol (ICP)
+              </strong>
+              , en typ av blockkedja, är det tekniskt omöjligt att helt radera
+              information som en gång har skrivits in i blockkedjan. Detta
+              innebär att innehållet kan finnas kvar i blockkedjans historik,
+              men det kommer inte längre att vara tillgängligt eller synligt för
+              andra användare på HKLO-bloggen.
+            </p>
+          </motion.div>
         </motion.div>
       </main>
 
