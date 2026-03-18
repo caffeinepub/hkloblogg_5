@@ -64,7 +64,7 @@ export enum UserRole {
     user = "user",
     guest = "guest"
 }
-export type NotificationEvent = "NewComment" | "NewReply" | "NewMedia";
+export type NotificationEvent = { NewComment: null } | { NewReply: null } | { NewMedia: null };
 export interface Notification {
     id: bigint;
     recipientPrincipal: Principal;

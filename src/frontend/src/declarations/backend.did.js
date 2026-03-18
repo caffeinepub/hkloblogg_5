@@ -76,6 +76,20 @@ export const SearchResult = IDL.Record({
   'comments' : IDL.Vec(Comment),
   'posts' : IDL.Vec(Post),
 });
+export const NotificationEvent = IDL.Variant({
+  'NewComment' : IDL.Null,
+  'NewReply' : IDL.Null,
+  'NewMedia' : IDL.Null,
+});
+export const Notification = IDL.Record({
+  'id' : IDL.Nat,
+  'recipientPrincipal' : IDL.Principal,
+  'postId' : IDL.Text,
+  'triggerPrincipal' : IDL.Principal,
+  'event' : NotificationEvent,
+  'createdAt' : Time,
+  'read' : IDL.Bool,
+});
 
 export const idlService = IDL.Service({
   '_caffeineStorageBlobIsLive' : IDL.Func(
@@ -113,6 +127,9 @@ export const idlService = IDL.Service({
   'deleteCategory' : IDL.Func([IDL.Text], [], []),
   'getHiddenCategoryIds' : IDL.Func([], [IDL.Vec(IDL.Text)], ['query']),
   'toggleCategoryHidden' : IDL.Func([IDL.Text, IDL.Bool], [], []),
+  'addUserToCategoryAllowedList' : IDL.Func([IDL.Text, IDL.Principal], [], []),
+  'removeUserFromCategoryAllowedList' : IDL.Func([IDL.Text, IDL.Principal], [], []),
+  'getCategoryAllowedUsers' : IDL.Func([IDL.Text], [IDL.Vec(IDL.Principal)], ['query']),
   'deleteComment' : IDL.Func([IDL.Text], [], []),
   'deleteMedia' : IDL.Func([IDL.Nat], [], []),
   'deleteMyAccount' : IDL.Func([], [], []),
@@ -169,6 +186,11 @@ export const idlService = IDL.Service({
   'isFollowingUser' : IDL.Func([IDL.Principal], [IDL.Bool], ['query']),
   'isFollowingPost' : IDL.Func([IDL.Text], [IDL.Bool], ['query']),
   'getPostFollowerCount' : IDL.Func([IDL.Text], [IDL.Nat], ['query']),
+  'getMyNotifications' : IDL.Func([], [IDL.Vec(Notification)], ['query']),
+  'getUnreadNotificationCount' : IDL.Func([], [IDL.Nat], ['query']),
+  'markNotificationRead' : IDL.Func([IDL.Nat], [], []),
+  'markAllNotificationsRead' : IDL.Func([], [], []),
+  'deleteNotification' : IDL.Func([IDL.Nat], [], []),
 });
 
 export const idlInitArgs = [];
@@ -242,7 +264,21 @@ export const idlFactory = ({ IDL }) => {
     'comments' : IDL.Vec(Comment),
     'posts' : IDL.Vec(Post),
   });
-  
+  const NotificationEvent = IDL.Variant({
+    'NewComment' : IDL.Null,
+    'NewReply' : IDL.Null,
+    'NewMedia' : IDL.Null,
+  });
+  const Notification = IDL.Record({
+    'id' : IDL.Nat,
+    'recipientPrincipal' : IDL.Principal,
+    'postId' : IDL.Text,
+    'triggerPrincipal' : IDL.Principal,
+    'event' : NotificationEvent,
+    'createdAt' : Time,
+    'read' : IDL.Bool,
+  });
+
   return IDL.Service({
     '_caffeineStorageBlobIsLive' : IDL.Func(
         [IDL.Vec(IDL.Nat8)],
@@ -279,6 +315,9 @@ export const idlFactory = ({ IDL }) => {
     'deleteCategory' : IDL.Func([IDL.Text], [], []),
     'getHiddenCategoryIds' : IDL.Func([], [IDL.Vec(IDL.Text)], ['query']),
     'toggleCategoryHidden' : IDL.Func([IDL.Text, IDL.Bool], [], []),
+    'addUserToCategoryAllowedList' : IDL.Func([IDL.Text, IDL.Principal], [], []),
+    'removeUserFromCategoryAllowedList' : IDL.Func([IDL.Text, IDL.Principal], [], []),
+    'getCategoryAllowedUsers' : IDL.Func([IDL.Text], [IDL.Vec(IDL.Principal)], ['query']),
     'deleteComment' : IDL.Func([IDL.Text], [], []),
     'deleteMedia' : IDL.Func([IDL.Nat], [], []),
     'deleteMyAccount' : IDL.Func([], [], []),
@@ -325,6 +364,21 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Nat],
         [],
       ),
+    'followUser' : IDL.Func([IDL.Principal], [], []),
+    'unfollowUser' : IDL.Func([IDL.Principal], [], []),
+    'followPost' : IDL.Func([IDL.Text], [], []),
+    'unfollowPost' : IDL.Func([IDL.Text], [], []),
+    'getFollowedUsers' : IDL.Func([], [IDL.Vec(IDL.Principal)], ['query']),
+    'getFollowedUsersPosts' : IDL.Func([], [IDL.Vec(Post)], ['query']),
+    'getFollowedPosts' : IDL.Func([], [IDL.Vec(IDL.Text)], ['query']),
+    'isFollowingUser' : IDL.Func([IDL.Principal], [IDL.Bool], ['query']),
+    'isFollowingPost' : IDL.Func([IDL.Text], [IDL.Bool], ['query']),
+    'getPostFollowerCount' : IDL.Func([IDL.Text], [IDL.Nat], ['query']),
+    'getMyNotifications' : IDL.Func([], [IDL.Vec(Notification)], ['query']),
+    'getUnreadNotificationCount' : IDL.Func([], [IDL.Nat], ['query']),
+    'markNotificationRead' : IDL.Func([IDL.Nat], [], []),
+    'markAllNotificationsRead' : IDL.Func([], [], []),
+    'deleteNotification' : IDL.Func([IDL.Nat], [], []),
   });
 };
 

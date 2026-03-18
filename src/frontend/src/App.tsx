@@ -9,6 +9,7 @@ import { useIsAdmin, useMyProfile } from "./hooks/useQueries";
 import AdminPanel from "./pages/AdminPanel";
 import FeedPage from "./pages/FeedPage";
 import LoginPage from "./pages/LoginPage";
+import MittFlodePage from "./pages/MittFlodePage";
 import PostForm from "./pages/PostForm";
 import PostView from "./pages/PostView";
 import ProfilePage from "./pages/ProfilePage";
@@ -21,7 +22,8 @@ type View =
   | { name: "edit-post"; postId: string }
   | { name: "admin" }
   | { name: "search"; query: string }
-  | { name: "profile" };
+  | { name: "profile" }
+  | { name: "myFeed" };
 
 const LOADING_TIMEOUT_MS = 15_000;
 
@@ -144,6 +146,16 @@ function AppShell() {
     );
   }
 
+  if (view.name === "myFeed") {
+    return (
+      <MittFlodePage
+        onBack={() => setView({ name: "feed" })}
+        onPost={(postId) => setView({ name: "post", postId })}
+        onProfile={() => setView({ name: "profile" })}
+      />
+    );
+  }
+
   if (view.name === "post") {
     return (
       <PostView
@@ -191,6 +203,7 @@ function AppShell() {
       onAdminPanel={() => setView({ name: "admin" })}
       onSearch={(query) => setView({ name: "search", query })}
       onProfile={() => setView({ name: "profile" })}
+      onMyFeed={() => setView({ name: "myFeed" })}
     />
   );
 }

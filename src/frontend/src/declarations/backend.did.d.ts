@@ -36,6 +36,18 @@ export interface MediaFile {
   'uploadedAt' : bigint,
   'postId' : [] | [bigint],
 }
+export type NotificationEvent = { 'NewComment' : null } |
+  { 'NewReply' : null } |
+  { 'NewMedia' : null };
+export interface Notification {
+  'id' : bigint,
+  'recipientPrincipal' : Principal,
+  'postId' : string,
+  'triggerPrincipal' : Principal,
+  'event' : NotificationEvent,
+  'createdAt' : Time,
+  'read' : boolean,
+}
 export interface Post {
   'id' : string,
   'categoryId' : string,
@@ -148,6 +160,11 @@ export interface _SERVICE {
   'isFollowingUser' : ActorMethod<[Principal], boolean>,
   'isFollowingPost' : ActorMethod<[string], boolean>,
   'getPostFollowerCount' : ActorMethod<[string], bigint>,
+  'getMyNotifications' : ActorMethod<[], Array<Notification>>,
+  'getUnreadNotificationCount' : ActorMethod<[], bigint>,
+  'markNotificationRead' : ActorMethod<[bigint], undefined>,
+  'markAllNotificationsRead' : ActorMethod<[], undefined>,
+  'deleteNotification' : ActorMethod<[bigint], undefined>,
 }
 export declare const idlService: IDL.ServiceClass;
 export declare const idlInitArgs: IDL.Type[];

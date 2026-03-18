@@ -546,3 +546,196 @@ export function useRemoveUserFromCategoryAllowedList() {
     },
   });
 }
+
+// ── Follow / Unfollow hooks ──────────────────────────────────────────────────
+
+export function useFollowPost() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (postId: string) => {
+      if (!actor) throw new Error("Inte inloggad");
+      return fullActor(actor).followPost(postId);
+    },
+    onSuccess: (_data, postId) => {
+      queryClient.invalidateQueries({ queryKey: ["isFollowingPost", postId] });
+      queryClient.invalidateQueries({ queryKey: ["followedPosts"] });
+      queryClient.invalidateQueries({
+        queryKey: ["postFollowerCount", postId],
+      });
+    },
+  });
+}
+
+export function useUnfollowPost() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (postId: string) => {
+      if (!actor) throw new Error("Inte inloggad");
+      return fullActor(actor).unfollowPost(postId);
+    },
+    onSuccess: (_data, postId) => {
+      queryClient.invalidateQueries({ queryKey: ["isFollowingPost", postId] });
+      queryClient.invalidateQueries({ queryKey: ["followedPosts"] });
+      queryClient.invalidateQueries({
+        queryKey: ["postFollowerCount", postId],
+      });
+    },
+  });
+}
+
+export function useIsFollowingPost(postId: string | null) {
+  const { actor, isFetching } = useActor();
+  return useQuery<boolean>({
+    queryKey: ["isFollowingPost", postId],
+    queryFn: async () => {
+      if (!actor || !postId) return false;
+      return fullActor(actor).isFollowingPost(postId);
+    },
+    enabled: !!actor && !isFetching && !!postId,
+  });
+}
+
+export function useGetPostFollowerCount(postId: string | null) {
+  const { actor, isFetching } = useActor();
+  return useQuery<bigint>({
+    queryKey: ["postFollowerCount", postId],
+    queryFn: async () => {
+      if (!actor || !postId) return BigInt(0);
+      return fullActor(actor).getPostFollowerCount(postId);
+    },
+    enabled: !!actor && !isFetching && !!postId,
+  });
+}
+
+export function useFollowUser() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (
+      principal: import("@icp-sdk/core/principal").Principal,
+    ) => {
+      if (!actor) throw new Error("Inte inloggad");
+      return fullActor(actor).followUser(principal);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["followedUsers"] });
+      queryClient.invalidateQueries({ queryKey: ["followedUsersPosts"] });
+    },
+  });
+}
+
+export function useUnfollowUser() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (
+      principal: import("@icp-sdk/core/principal").Principal,
+    ) => {
+      if (!actor) throw new Error("Inte inloggad");
+      return fullActor(actor).unfollowUser(principal);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["followedUsers"] });
+      queryClient.invalidateQueries({ queryKey: ["followedUsersPosts"] });
+    },
+  });
+}
+
+export function useGetFollowedUsersPosts() {
+  const { actor, isFetching } = useActor();
+  return useQuery<Post[]>({
+    queryKey: ["followedUsersPosts"],
+    queryFn: async () => {
+      if (!actor) return [];
+      return fullActor(actor).getFollowedUsersPosts();
+    },
+    enabled: !!actor && !isFetching,
+  });
+}
+
+export function useGetFollowedPosts() {
+  const { actor, isFetching } = useActor();
+  return useQuery<string[]>({
+    queryKey: ["followedPosts"],
+    queryFn: async () => {
+      if (!actor) return [];
+      return fullActor(actor).getFollowedPosts();
+    },
+    enabled: !!actor && !isFetching,
+  });
+}
+
+// ── Notification hooks ───────────────────────────────────────────────────────
+
+export function useGetMyNotifications() {
+  const { actor, isFetching } = useActor();
+  return useQuery<import("../backend.d").Notification[]>({
+    queryKey: ["notifications"],
+    queryFn: async () => {
+      if (!actor) return [];
+      return fullActor(actor).getMyNotifications();
+    },
+    enabled: !!actor && !isFetching,
+    refetchInterval: 30_000,
+  });
+}
+
+export function useGetUnreadNotificationCount() {
+  const { actor, isFetching } = useActor();
+  return useQuery<bigint>({
+    queryKey: ["unreadCount"],
+    queryFn: async () => {
+      if (!actor) return BigInt(0);
+      return fullActor(actor).getUnreadNotificationCount();
+    },
+    enabled: !!actor && !isFetching,
+    refetchInterval: 30_000,
+  });
+}
+
+export function useMarkNotificationRead() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: bigint) => {
+      if (!actor) throw new Error("Inte inloggad");
+      return fullActor(actor).markNotificationRead(id);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
+      queryClient.invalidateQueries({ queryKey: ["unreadCount"] });
+    },
+  });
+}
+
+export function useMarkAllNotificationsRead() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      if (!actor) throw new Error("Inte inloggad");
+      return fullActor(actor).markAllNotificationsRead();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
+      queryClient.invalidateQueries({ queryKey: ["unreadCount"] });
+    },
+  });
+}
+
+export function useDeleteNotification() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: bigint) => {
+      if (!actor) throw new Error("Inte inloggad");
+      return fullActor(actor).deleteNotification(id);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
+      queryClient.invalidateQueries({ queryKey: ["unreadCount"] });
+    },
+  });
+}

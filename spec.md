@@ -1,32 +1,35 @@
 # HKLOblogg
 
 ## Current State
-Bloggen har kategorier, inlägg, kommentarer, likes, media-uppladdning, category hiding/whitelisting och användarsystem med Internet Identity. Backend är i Motoko.
+Backend stöder följning (Fas 1, v22) och notissystem (Fas 2, v23). Alla metoder finns i backend.d.ts men declarations-filerna saknar notification-typer/-metoder, och idlFactory saknar follow-metoderna. Frontend saknar UI för följning, Mitt flöde och notiser.
 
 ## Requested Changes (Diff)
 
 ### Add
-- `userFollows` map: lagrar vilka användare en principal följer
-- `postFollows` map: lagrar vilka användare som följer ett visst inlägg
-- `followUser(user)` / `unfollowUser(user)` – följa/avfölja en användare
-- `followPost(postId)` / `unfollowPost(postId)` – följa/avfölja ett inlägg
-- `getFollowedUsers()` – returnerar lista med principals jag följer
-- `getFollowedUsersPosts()` – returnerar inlägg från användare jag följer
-- `getFollowedPosts()` – returnerar lista med post-IDs jag följer
-- `isFollowingUser(user)` – returnerar bool
-- `isFollowingPost(postId)` – returnerar bool
-- `getPostFollowerCount(postId)` – antal som följer ett inlägg
-- Rensa upp följ-relationer när en användare raderas (deleteUserContent)
+- Notification/NotificationEvent-typer i declarations/backend.did.d.ts och backend.did.js
+- Notification-metoder i declarations: getMyNotifications, getUnreadNotificationCount, markNotificationRead, markAllNotificationsRead, deleteNotification
+- Follow-metoder i idlFactory i backend.did.js (de finns i idlService men saknas i idlFactory)
+- Nya hooks i useQueries.ts för follow/unfollow/notifications
+- Ny sida MittFlodePage.tsx med flikar: Följda användare och Följda inlägg
+- Notisklocka med unread-badge i FeedPage header med notisdropdown
+- Följ/avfölja-knapp på PostView
+- View 'myFeed' i App.tsx
 
 ### Modify
-- `deleteUserContent` – ta bort user från userFollows och postFollows vid radering
+- declarations/backend.did.d.ts och backend.did.js: komplettera med notification och follow
+- App.tsx: myFeed-routing
+- FeedPage.tsx: notisklocka i header
+- PostView.tsx: följ/avfölja-knapp
 
 ### Remove
-- Inget
+- Ingenting
 
 ## Implementation Plan
-1. Lägg till `userFollows` och `postFollows` maps i state
-2. Implementera followUser/unfollowUser med validering
-3. Implementera followPost/unfollowPost med validering
-4. Implementera query-metoder: getFollowedUsers, getFollowedUsersPosts, getFollowedPosts, isFollowingUser, isFollowingPost, getPostFollowerCount
-5. Uppdatera deleteUserContent för att städa upp följ-data
+1. Uppdatera declarations/backend.did.d.ts
+2. Uppdatera declarations/backend.did.js
+3. Lägg till hooks i useQueries.ts
+4. Skapa MittFlodePage.tsx
+5. Uppdatera FeedPage.tsx med notisklocka
+6. Uppdatera PostView.tsx med följ/avfölja
+7. Uppdatera App.tsx
+8. Validera

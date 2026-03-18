@@ -9,6 +9,7 @@ import {
   LogOut,
   PenLine,
   Pin,
+  Rss,
   Search,
   Shield,
   User,
@@ -17,6 +18,7 @@ import { motion } from "motion/react";
 import { useState } from "react";
 import type { Post } from "../backend.d";
 import AuthorName from "../components/AuthorName";
+import NotificationBell from "../components/NotificationBell";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import {
   useIsAdmin,
@@ -33,6 +35,7 @@ interface FeedPageProps {
   onAdminPanel: () => void;
   onSearch: (query: string) => void;
   onProfile: () => void;
+  onMyFeed: () => void;
 }
 
 function PostCard({
@@ -112,6 +115,7 @@ export default function FeedPage({
   onAdminPanel,
   onSearch,
   onProfile,
+  onMyFeed,
 }: FeedPageProps) {
   const { identity, clear } = useInternetIdentity();
   const { data: profile } = useMyProfile();
@@ -169,6 +173,24 @@ export default function FeedPage({
                 />
               </div>
             </form>
+
+            {/* Mitt flöde */}
+            {identity && hasProfile && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onMyFeed}
+                className="gap-1.5 text-muted-foreground hover:text-foreground"
+                title="Mitt flöde"
+              >
+                <Rss className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Mitt flöde</span>
+              </Button>
+            )}
+
+            {/* Notification bell */}
+            {identity && hasProfile && <NotificationBell onPost={onPost} />}
+
             {profile && (
               <button
                 type="button"

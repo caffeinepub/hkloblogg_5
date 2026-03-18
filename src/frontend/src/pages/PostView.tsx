@@ -17,6 +17,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useQuery } from "@tanstack/react-query";
 import {
   ArrowLeft,
+  Bell,
+  BellOff,
   BookOpen,
   Heart,
   LogOut,
@@ -38,12 +40,16 @@ import { useActor } from "../hooks/useActor";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import {
   useDeletePost,
+  useFollowPost,
   useGetPost,
+  useGetPostFollowerCount,
   useIsAdmin,
+  useIsFollowingPost,
   useLikePost,
   useListCategories,
   useMyLikedPosts,
   usePinPost,
+  useUnfollowPost,
 } from "../hooks/useQueries";
 import { useStorageClient } from "../hooks/useStorageClient";
 
@@ -70,6 +76,10 @@ export default function PostView({
   const likePost = useLikePost();
   const deletePost = useDeletePost();
   const pinPost = usePinPost();
+  const followPost = useFollowPost();
+  const unfollowPost = useUnfollowPost();
+  const { data: isFollowing } = useIsFollowingPost(postId);
+  const { data: followerCount } = useGetPostFollowerCount(postId);
   const { actor } = useActor();
   const storageClient = useStorageClient();
   const [searchInput, setSearchInput] = useState("");
@@ -125,6 +135,20 @@ export default function PostView({
       toast.success(post.pinned ? "Inlägg lossades." : "Inlägg fastnålades.");
     } catch {
       toast.error("Kunde inte ändra fastnålning.");
+    }
+  };
+
+  const handleFollow = async () => {
+    try {
+      if (isFollowing) {
+        await unfollowPost.mutateAsync(postId);
+        toast.success("Du följer inte längre inlägget.");
+      } else {
+        await followPost.mutateAsync(postId);
+        toast.success("Du följer nu inlägget.");
+      }
+    } catch {
+      toast.error("Kunde inte ändra följning.");
     }
   };
 
@@ -321,6 +345,34 @@ export default function PostView({
                   {post.likeCount.toString()}
                   {isLiked ? " Gillad" : " Gilla"}
                 </button>
+
+                {/* Follow button */}
+                {identity && (
+                  <button
+                    type="button"
+                    data-ocid="post.follow.button"
+                    onClick={handleFollow}
+                    disabled={followPost.isPending || unfollowPost.isPending}
+                    className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium border transition-all ${
+                      isFollowing
+                        ? "bg-blue-50 border-blue-200 text-blue-600 hover:bg-blue-100"
+                        : "border-border text-muted-foreground hover:text-foreground hover:border-foreground/30 hover:bg-muted"
+                    }`}
+                  >
+                    {isFollowing ? (
+                      <BellOff className="w-4 h-4" />
+                    ) : (
+                      <Bell className="w-4 h-4" />
+                    )}
+                    {isFollowing ? "Avfölja" : "Följ inlägg"}
+                    {followerCount !== undefined &&
+                      followerCount > BigInt(0) && (
+                        <span className="text-xs opacity-70">
+                          · {followerCount.toString()}
+                        </span>
+                      )}
+                  </button>
+                )}
               </div>
 
               <div className="flex items-center gap-2">
