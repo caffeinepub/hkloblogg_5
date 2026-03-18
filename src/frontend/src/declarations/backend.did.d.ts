@@ -77,6 +77,21 @@ export interface UserWithPrincipal {
   'principal' : Principal,
   'profile' : UserProfile,
 }
+export interface CategorySchedule {
+  'enabled' : boolean,
+  'weekday' : bigint,
+  'hour' : bigint,
+  'lastRunAt' : [] | [bigint],
+}
+export interface CleanupLog {
+  'id' : bigint,
+  'categoryId' : string,
+  'categoryName' : string,
+  'ranAt' : Time,
+  'postsDeleted' : bigint,
+  'commentsDeleted' : bigint,
+  'mediaDeleted' : bigint,
+}
 export interface _CaffeineStorageCreateCertificateResult {
   'method' : string,
   'blob_hash' : string,
@@ -165,6 +180,14 @@ export interface _SERVICE {
   'markNotificationRead' : ActorMethod<[bigint], undefined>,
   'markAllNotificationsRead' : ActorMethod<[], undefined>,
   'deleteNotification' : ActorMethod<[bigint], undefined>,
+  'assignModerator' : ActorMethod<[Principal], undefined>,
+  'revokeModerator' : ActorMethod<[Principal], undefined>,
+  'isCallerModerator' : ActorMethod<[], boolean>,
+  'isUserModerator' : ActorMethod<[Principal], boolean>,
+  'listModerators' : ActorMethod<[], Array<Principal>>,
+  'setCategorySchedule' : ActorMethod<[string, boolean, bigint, bigint], undefined>,
+  'getCategorySchedule' : ActorMethod<[string], [] | [CategorySchedule]>,
+  'listCleanupLogs' : ActorMethod<[[] | [string]], Array<CleanupLog>>,
 }
 export declare const idlService: IDL.ServiceClass;
 export declare const idlInitArgs: IDL.Type[];

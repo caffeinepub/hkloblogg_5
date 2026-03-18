@@ -1000,6 +1000,123 @@ export class Backend implements backendInterface {
             return result;
         }
     }
+    async assignModerator(arg0: Principal): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await (this.actor as any).assignModerator(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error('unreachable');
+            }
+        } else {
+            const result = await (this.actor as any).assignModerator(arg0);
+            return result;
+        }
+    }
+    async revokeModerator(arg0: Principal): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await (this.actor as any).revokeModerator(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error('unreachable');
+            }
+        } else {
+            const result = await (this.actor as any).revokeModerator(arg0);
+            return result;
+        }
+    }
+    async isCallerModerator(): Promise<boolean> {
+        if (this.processError) {
+            try {
+                const result = await (this.actor as any).isCallerModerator();
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error('unreachable');
+            }
+        } else {
+            const result = await (this.actor as any).isCallerModerator();
+            return result;
+        }
+    }
+    async isUserModerator(arg0: Principal): Promise<boolean> {
+        if (this.processError) {
+            try {
+                const result = await (this.actor as any).isUserModerator(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error('unreachable');
+            }
+        } else {
+            const result = await (this.actor as any).isUserModerator(arg0);
+            return result;
+        }
+    }
+    async listModerators(): Promise<Array<Principal>> {
+        if (this.processError) {
+            try {
+                const result = await (this.actor as any).listModerators();
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error('unreachable');
+            }
+        } else {
+            const result = await (this.actor as any).listModerators();
+            return result;
+        }
+    }
+    async setCategorySchedule(categoryId: string, enabled: boolean, weekday: bigint, hour: bigint): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await (this.actor as any).setCategorySchedule(categoryId, enabled, weekday, hour);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error('unreachable');
+            }
+        } else {
+            const result = await (this.actor as any).setCategorySchedule(categoryId, enabled, weekday, hour);
+            return result;
+        }
+    }
+    async getCategorySchedule(categoryId: string): Promise<import('./backend.d').CategorySchedule | null> {
+        if (this.processError) {
+            try {
+                const result = await (this.actor as any).getCategorySchedule(categoryId);
+                if (!result || result.length === 0) return null;
+                const s = result[0];
+                return { enabled: s.enabled, weekday: s.weekday, hour: s.hour, lastRunAt: s.lastRunAt.length > 0 ? s.lastRunAt[0] : null };
+            } catch (e) {
+                this.processError(e);
+                throw new Error('unreachable');
+            }
+        } else {
+            const result = await (this.actor as any).getCategorySchedule(categoryId);
+            if (!result || result.length === 0) return null;
+            const s = result[0];
+            return { enabled: s.enabled, weekday: s.weekday, hour: s.hour, lastRunAt: s.lastRunAt.length > 0 ? s.lastRunAt[0] : null };
+        }
+    }
+    async listCleanupLogs(categoryId: string | null): Promise<Array<import('./backend.d').CleanupLog>> {
+        const arg0: [] | [string] = categoryId === null ? [] : [categoryId];
+        if (this.processError) {
+            try {
+                const result = await (this.actor as any).listCleanupLogs(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error('unreachable');
+            }
+        } else {
+            const result = await (this.actor as any).listCleanupLogs(arg0);
+            return result;
+        }
+    }
 }
 function from_candid_Comment_n21(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _Comment): Comment {
     return from_candid_record_n22(_uploadFile, _downloadFile, value);

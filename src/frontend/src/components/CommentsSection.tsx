@@ -11,15 +11,12 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useQuery } from "@tanstack/react-query";
 import { Heart, Loader2, MessageCircle, Pencil, Trash2 } from "lucide-react";
 import { motion } from "motion/react";
 import { useState } from "react";
 import { toast } from "sonner";
 import type { Comment } from "../backend.d";
-import { useActor } from "../hooks/useActor";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
-import { useMediaUpload } from "../hooks/useMediaUpload";
 import {
   useCreateComment,
   useDeleteComment,
@@ -30,13 +27,9 @@ import {
   useListComments,
   useMyLikedComments,
 } from "../hooks/useQueries";
-import { useStorageClient } from "../hooks/useStorageClient";
 import AuthorName from "./AuthorName";
 import EmojiPicker from "./EmojiPicker";
-import MediaGallery from "./MediaGallery";
-import MediaUploader, { type StagedFile, compressImage } from "./MediaUploader";
 import RichEditor from "./RichEditor";
-import VideoPlayer from "./VideoPlayer";
 
 function formatDate(ts: bigint): string {
   return new Date(Number(ts) / 1_000_000).toLocaleDateString("sv-SE", {
@@ -62,7 +55,6 @@ interface CommentItemProps {
   postId: string;
   depth: number;
   index: number;
-  storageClient: ReturnType<typeof useStorageClient>;
 }
 
 function CommentItem({
@@ -75,37 +67,12 @@ function CommentItem({
   postId,
   depth,
   index,
-  storageClient,
 }: CommentItemProps) {
   const [showReplyForm, setShowReplyForm] = useState(false);
   const [replyBody, setReplyBody] = useState("");
   const [editing, setEditing] = useState(false);
   const [editBody, setEditBody] = useState(comment.body);
-  const [replyStagedFiles, setReplyStagedFiles] = useState<StagedFile[]>([]);
   const [likeAnimating, setLikeAnimating] = useState(false);
-
-  const { actor } = useActor();
-  const {
-    uploadFiles: uploadReplyMedia,
-    uploading: uploadingReply,
-    progress: replyProgress,
-  } = useMediaUpload();
-
-  const { data: commentMedia } = useQuery({
-    queryKey: ["commentMedia", comment.id],
-    queryFn: async () => {
-      if (!actor) return [];
-      return actor.getMediaForComment(BigInt(comment.id));
-    },
-    enabled: !!actor,
-  });
-
-  const commentImages = (commentMedia ?? []).filter(
-    (m) => m.fileType === "image",
-  );
-  const commentVideos = (commentMedia ?? []).filter(
-    (m) => m.fileType === "video",
-  );
 
   const likeComment = useLikeComment();
   const deleteComment = useDeleteComment();
@@ -141,43 +108,7 @@ function CommentItem({
         body: replyBody,
         parentId: comment.id,
       });
-
-      // Upload media for reply
-      const validFiles = replyStagedFiles.filter((sf) => !sf.error);
-      if (validFiles.length > 0 && actor) {
-        try {
-          const allCommentsList = await actor.listComments(postId);
-          const myPrincipalStr = myPrincipal;
-          const newComment = allCommentsList
-            .filter(
-              (c) =>
-                c.parentId === comment.id &&
-                c.authorPrincipal.toString() === myPrincipalStr,
-            )
-            .sort((a, b) => Number(b.createdAt) - Number(a.createdAt))[0];
-
-          if (newComment) {
-            const filesToUpload = await Promise.all(
-              validFiles.map(async (sf) => {
-                if (sf.compress && sf.file.type.startsWith("image/")) {
-                  try {
-                    return await compressImage(sf.file);
-                  } catch {
-                    return sf.file;
-                  }
-                }
-                return sf.file;
-              }),
-            );
-            await uploadReplyMedia(filesToUpload, null, BigInt(newComment.id));
-          }
-        } catch {
-          // media upload failed silently
-        }
-      }
-
       setReplyBody("");
-      setReplyStagedFiles([]);
       setShowReplyForm(false);
       toast.success("Svar skickat.");
     } catch {
@@ -276,27 +207,11 @@ function CommentItem({
             </div>
           </div>
         ) : (
-          <>
-            <div
-              className="prose prose-slate max-w-none text-sm text-foreground leading-relaxed"
-              // biome-ignore lint/security/noDangerouslySetInnerHtml: comment body is HTML from backend
-              dangerouslySetInnerHTML={{ __html: comment.body }}
-            />
-            {commentImages.length > 0 && (
-              <MediaGallery
-                mediaFiles={commentImages}
-                storageClient={storageClient}
-              />
-            )}
-            {commentVideos.map((video) => (
-              <VideoPlayer
-                key={video.id.toString()}
-                blobKey={video.blobKey}
-                fileName={video.fileName}
-                storageClient={storageClient}
-              />
-            ))}
-          </>
+          <div
+            className="prose prose-slate max-w-none text-sm text-foreground leading-relaxed"
+            // biome-ignore lint/security/noDangerouslySetInnerHtml: comment body is HTML from backend
+            dangerouslySetInnerHTML={{ __html: comment.body }}
+          />
         )}
 
         {/* Action row */}
@@ -389,25 +304,14 @@ function CommentItem({
               minHeight={80}
             />
           </div>
-          <MediaUploader
-            stagedFiles={replyStagedFiles}
-            onFilesChange={setReplyStagedFiles}
-            uploading={uploadingReply}
-            progress={replyProgress}
-            disabled={createComment.isPending}
-          />
           <div className="flex items-center gap-2 mt-2">
             <Button
               data-ocid="comments.reply.submit_button"
               size="sm"
               onClick={handleReply}
-              disabled={
-                createComment.isPending ||
-                uploadingReply ||
-                !stripHtml(replyBody)
-              }
+              disabled={createComment.isPending || !stripHtml(replyBody)}
             >
-              {createComment.isPending || uploadingReply ? (
+              {createComment.isPending ? (
                 <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />
               ) : null}
               Skicka svar
@@ -419,7 +323,6 @@ function CommentItem({
               onClick={() => {
                 setShowReplyForm(false);
                 setReplyBody("");
-                setReplyStagedFiles([]);
               }}
             >
               Avbryt
@@ -441,7 +344,6 @@ function CommentItem({
           postId={postId}
           depth={depth + 1}
           index={index * 100 + i + 1}
-          storageClient={storageClient}
         />
       ))}
     </motion.div>
@@ -459,16 +361,8 @@ export default function CommentsSection({ postId }: CommentsSectionProps) {
   const { data: comments, isLoading } = useListComments(postId);
   const { data: likedComments } = useMyLikedComments();
   const createComment = useCreateComment();
-  const { actor } = useActor();
-  const storageClient = useStorageClient();
-  const {
-    uploadFiles: uploadNewCommentMedia,
-    uploading: uploadingNew,
-    progress: newProgress,
-  } = useMediaUpload();
 
   const [newBody, setNewBody] = useState("");
-  const [newStagedFiles, setNewStagedFiles] = useState<StagedFile[]>([]);
 
   const myPrincipal = identity?.getPrincipal().toString();
   const likedSet = new Set(likedComments ?? []);
@@ -485,45 +379,7 @@ export default function CommentsSection({ postId }: CommentsSectionProps) {
         body: newBody,
         parentId: null,
       });
-
-      // Upload media for new comment
-      const validFiles = newStagedFiles.filter((sf) => !sf.error);
-      if (validFiles.length > 0 && actor) {
-        try {
-          const allCommentsList = await actor.listComments(postId);
-          const newComment = allCommentsList
-            .filter(
-              (c) =>
-                !c.parentId && c.authorPrincipal.toString() === myPrincipal,
-            )
-            .sort((a, b) => Number(b.createdAt) - Number(a.createdAt))[0];
-
-          if (newComment) {
-            const filesToUpload = await Promise.all(
-              validFiles.map(async (sf) => {
-                if (sf.compress && sf.file.type.startsWith("image/")) {
-                  try {
-                    return await compressImage(sf.file);
-                  } catch {
-                    return sf.file;
-                  }
-                }
-                return sf.file;
-              }),
-            );
-            await uploadNewCommentMedia(
-              filesToUpload,
-              null,
-              BigInt(newComment.id),
-            );
-          }
-        } catch {
-          // media upload failed silently
-        }
-      }
-
       setNewBody("");
-      setNewStagedFiles([]);
       toast.success("Kommentar publicerad.");
     } catch {
       toast.error("Kunde inte publicera kommentaren.");
@@ -550,23 +406,14 @@ export default function CommentsSection({ postId }: CommentsSectionProps) {
           placeholder="Skriv en kommentar…"
           minHeight={100}
         />
-        <div className="mt-3 space-y-3">
-          <MediaUploader
-            stagedFiles={newStagedFiles}
-            onFilesChange={setNewStagedFiles}
-            uploading={uploadingNew}
-            progress={newProgress}
-            disabled={createComment.isPending}
-          />
+        <div className="mt-3">
           <Button
             data-ocid="comments.new.submit_button"
             size="sm"
             onClick={handleSubmit}
-            disabled={
-              createComment.isPending || uploadingNew || !stripHtml(newBody)
-            }
+            disabled={createComment.isPending || !stripHtml(newBody)}
           >
-            {createComment.isPending || uploadingNew ? (
+            {createComment.isPending ? (
               <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />
             ) : null}
             Kommentera
@@ -609,7 +456,6 @@ export default function CommentsSection({ postId }: CommentsSectionProps) {
               postId={postId}
               depth={0}
               index={i + 1}
-              storageClient={storageClient}
             />
           ))}
         </div>

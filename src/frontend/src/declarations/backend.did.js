@@ -68,6 +68,21 @@ export const Comment = IDL.Record({
   'authorPrincipal' : IDL.Principal,
   'postId' : IDL.Text,
 });
+export const CategorySchedule = IDL.Record({
+  'enabled' : IDL.Bool,
+  'weekday' : IDL.Nat,
+  'hour' : IDL.Nat,
+  'lastRunAt' : IDL.Opt(IDL.Int),
+});
+export const CleanupLog = IDL.Record({
+  'id' : IDL.Nat,
+  'categoryId' : IDL.Text,
+  'categoryName' : IDL.Text,
+  'ranAt' : IDL.Int,
+  'postsDeleted' : IDL.Nat,
+  'commentsDeleted' : IDL.Nat,
+  'mediaDeleted' : IDL.Nat,
+});
 export const UserWithPrincipal = IDL.Record({
   'principal' : IDL.Principal,
   'profile' : UserProfile,
@@ -191,6 +206,14 @@ export const idlService = IDL.Service({
   'markNotificationRead' : IDL.Func([IDL.Nat], [], []),
   'markAllNotificationsRead' : IDL.Func([], [], []),
   'deleteNotification' : IDL.Func([IDL.Nat], [], []),
+  'assignModerator' : IDL.Func([IDL.Principal], [], []),
+  'revokeModerator' : IDL.Func([IDL.Principal], [], []),
+  'isCallerModerator' : IDL.Func([], [IDL.Bool], ['query']),
+  'isUserModerator' : IDL.Func([IDL.Principal], [IDL.Bool], ['query']),
+  'listModerators' : IDL.Func([], [IDL.Vec(IDL.Principal)], ['query']),
+  'setCategorySchedule' : IDL.Func([IDL.Text, IDL.Bool, IDL.Nat, IDL.Nat], [], []),
+  'getCategorySchedule' : IDL.Func([IDL.Text], [IDL.Opt(CategorySchedule)], ['query']),
+  'listCleanupLogs' : IDL.Func([IDL.Opt(IDL.Text)], [IDL.Vec(CleanupLog)], ['query']),
 });
 
 export const idlInitArgs = [];
@@ -277,6 +300,21 @@ export const idlFactory = ({ IDL }) => {
     'event' : NotificationEvent,
     'createdAt' : Time,
     'read' : IDL.Bool,
+  });
+  const CategorySchedule = IDL.Record({
+    'enabled' : IDL.Bool,
+    'weekday' : IDL.Nat,
+    'hour' : IDL.Nat,
+    'lastRunAt' : IDL.Opt(IDL.Int),
+  });
+  const CleanupLog = IDL.Record({
+    'id' : IDL.Nat,
+    'categoryId' : IDL.Text,
+    'categoryName' : IDL.Text,
+    'ranAt' : IDL.Int,
+    'postsDeleted' : IDL.Nat,
+    'commentsDeleted' : IDL.Nat,
+    'mediaDeleted' : IDL.Nat,
   });
 
   return IDL.Service({
@@ -379,6 +417,14 @@ export const idlFactory = ({ IDL }) => {
     'markNotificationRead' : IDL.Func([IDL.Nat], [], []),
     'markAllNotificationsRead' : IDL.Func([], [], []),
     'deleteNotification' : IDL.Func([IDL.Nat], [], []),
+    'assignModerator' : IDL.Func([IDL.Principal], [], []),
+    'revokeModerator' : IDL.Func([IDL.Principal], [], []),
+    'isCallerModerator' : IDL.Func([], [IDL.Bool], ['query']),
+    'isUserModerator' : IDL.Func([IDL.Principal], [IDL.Bool], ['query']),
+    'listModerators' : IDL.Func([], [IDL.Vec(IDL.Principal)], ['query']),
+    'setCategorySchedule' : IDL.Func([IDL.Text, IDL.Bool, IDL.Nat, IDL.Nat], [], []),
+    'getCategorySchedule' : IDL.Func([IDL.Text], [IDL.Opt(CategorySchedule)], ['query']),
+    'listCleanupLogs' : IDL.Func([IDL.Opt(IDL.Text)], [IDL.Vec(CleanupLog)], ['query']),
   });
 };
 
