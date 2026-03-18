@@ -35,6 +35,7 @@ import { toast } from "sonner";
 import AuthorName from "../components/AuthorName";
 import CommentsSection from "../components/CommentsSection";
 import MediaGallery from "../components/MediaGallery";
+import MobileMenu from "../components/MobileMenu";
 import ScrollToTop from "../components/ScrollToTop";
 import VideoPlayer from "../components/VideoPlayer";
 import { useActor } from "../hooks/useActor";
@@ -46,6 +47,7 @@ import {
   useGetPostFollowerCount,
   useIsAdmin,
   useIsFollowingPost,
+  useIsModerator,
   useLikePost,
   useListCategories,
   useMyLikedPosts,
@@ -72,6 +74,7 @@ export default function PostView({
 }: PostViewProps) {
   const { clear, identity } = useInternetIdentity();
   const { data: isAdmin } = useIsAdmin();
+  const { data: isModerator } = useIsModerator();
   const { data: post, isLoading } = useGetPost(postId);
   const { data: likedPosts } = useMyLikedPosts();
   const { data: categories } = useListCategories();
@@ -85,6 +88,7 @@ export default function PostView({
   const { actor } = useActor();
   const storageClient = useStorageClient();
   const [searchInput, setSearchInput] = useState("");
+  const [likeAnimating, setLikeAnimating] = useState(false);
 
   const { data: postMedia } = useQuery({
     queryKey: ["postMedia", postId],
@@ -109,12 +113,15 @@ export default function PostView({
   const isAuthor =
     !!myPrincipal && !!post && myPrincipal === post.authorPrincipal.toString();
 
-  const canEdit = isAdmin || isAuthor;
-  const canDelete = isAdmin || isAuthor;
+  const canEdit = isAdmin || isModerator || isAuthor;
+  const canDelete = isAdmin || isModerator || isAuthor;
 
   const handleLike = async () => {
     try {
       await likePost.mutateAsync(postId);
+      setLikeAnimating(true);
+      setTimeout(() => setLikeAnimating(false), 600);
+      toast.success("Gillat! ❤️");
     } catch {
       toast.error("Kunde inte gilla inlägget.");
     }
@@ -172,7 +179,7 @@ export default function PostView({
               variant="ghost"
               size="sm"
               onClick={onBack}
-              className="text-muted-foreground -ml-2"
+              className="text-muted-foreground -ml-2 focus-visible:ring-2 focus-visible:ring-ring"
             >
               <ArrowLeft className="w-4 h-4 mr-1" />
               Tillbaka
@@ -186,7 +193,7 @@ export default function PostView({
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {/* Search bar */}
+            {/* Search bar – desktop */}
             <form
               onSubmit={handleSearch}
               className="hidden sm:flex items-center"
@@ -202,27 +209,34 @@ export default function PostView({
                 />
               </div>
             </form>
+
+            {/* Admin panel – desktop */}
             {isAdmin && (
               <Button
                 data-ocid="post.admin_panel.button"
                 variant="outline"
                 size="sm"
                 onClick={onAdminPanel}
-                className="gap-1.5 text-primary border-primary/30 hover:bg-primary/5"
+                className="hidden sm:flex gap-1.5 text-primary border-primary/30 hover:bg-primary/5"
               >
                 <Shield className="w-3.5 h-3.5" />
                 <span className="hidden sm:inline">Adminpanel</span>
               </Button>
             )}
+
+            {/* Logout – desktop */}
             <Button
               data-ocid="post.logout.button"
               variant="ghost"
               size="sm"
               onClick={clear}
-              className="text-muted-foreground"
+              className="hidden sm:flex text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
             >
               <LogOut className="w-4 h-4" />
             </Button>
+
+            {/* Mobile hamburger menu */}
+            <MobileMenu onAdminPanel={onAdminPanel} onSearch={onSearch} />
           </div>
         </div>
       </header>
@@ -252,16 +266,16 @@ export default function PostView({
               <button
                 type="button"
                 onClick={onBack}
-                className="hover:text-primary transition-colors hover:underline"
+                className="hover:text-primary transition-colors hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
               >
                 Hem
               </button>
-              <span>203a</span>
+              <span>›</span>
               <span className="truncate max-w-[140px]">{categoryName}</span>
-              <span>203a</span>
+              <span>›</span>
               <span className="truncate max-w-[200px] text-foreground/70">
                 {post.title.length > 40
-                  ? `${post.title.slice(0, 40)}2026`
+                  ? `${post.title.slice(0, 40)}…`
                   : post.title}
               </span>
             </nav>
@@ -356,7 +370,7 @@ export default function PostView({
                   data-ocid="post.like.button"
                   onClick={handleLike}
                   disabled={likePost.isPending}
-                  className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium border transition-all ${
+                  className={`flex items-center gap-1.5 px-4 py-2.5 min-h-[44px] rounded-full text-sm font-medium border transition-all touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${likeAnimating ? "like-pulse " : ""}${
                     isLiked
                       ? "bg-rose-50 border-rose-200 text-rose-600 hover:bg-rose-100"
                       : "border-border text-muted-foreground hover:text-foreground hover:border-foreground/30 hover:bg-muted"
@@ -376,7 +390,7 @@ export default function PostView({
                     data-ocid="post.follow.button"
                     onClick={handleFollow}
                     disabled={followPost.isPending || unfollowPost.isPending}
-                    className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium border transition-all ${
+                    className={`flex items-center gap-1.5 px-4 py-2.5 min-h-[44px] rounded-full text-sm font-medium border transition-all touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                       isFollowing
                         ? "bg-blue-50 border-blue-200 text-blue-600 hover:bg-blue-100"
                         : "border-border text-muted-foreground hover:text-foreground hover:border-foreground/30 hover:bg-muted"
@@ -406,7 +420,7 @@ export default function PostView({
                     size="sm"
                     onClick={handlePin}
                     disabled={pinPost.isPending}
-                    className="gap-1.5"
+                    className="gap-1.5 focus-visible:ring-2 focus-visible:ring-ring"
                   >
                     {post.pinned ? (
                       <>
@@ -428,7 +442,7 @@ export default function PostView({
                     variant="outline"
                     size="sm"
                     onClick={() => onEdit(postId)}
-                    className="gap-1.5"
+                    className="gap-1.5 focus-visible:ring-2 focus-visible:ring-ring"
                   >
                     <Pencil className="w-3.5 h-3.5" />
                     Redigera
@@ -442,7 +456,7 @@ export default function PostView({
                         data-ocid="post.delete.button"
                         variant="outline"
                         size="sm"
-                        className="gap-1.5 text-destructive border-destructive/30 hover:bg-destructive/10 hover:text-destructive"
+                        className="gap-1.5 text-destructive border-destructive/30 hover:bg-destructive/10 hover:text-destructive focus-visible:ring-2 focus-visible:ring-ring"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                         Radera

@@ -59,6 +59,18 @@ export default function LoginPage() {
                 "Logga in med Internet Identity"
               )}
             </Button>
+
+            <p className="text-xs text-muted-foreground text-center mt-4">
+              Ny användare?{" "}
+              <a
+                href="https://identity.ic0.app/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary hover:underline font-medium"
+              >
+                Skapa ett Internet Identity här
+              </a>
+            </p>
           </div>
 
           {/* GDPR clarification */}
@@ -83,10 +95,10 @@ export default function LoginPage() {
                 Internet Computer Protocol (ICP)
               </strong>
               , en typ av blockkedja, är det tekniskt omöjligt att helt radera
-              information som en gång har skrivits in i blockkedjan. Detta
-              innebär att innehållet kan finnas kvar i blockkedjans historik,
-              men det kommer inte längre att vara tillgängligt eller synligt för
-              andra användare på HKLO-bloggen.
+              information som en gång har skrivits in i blockkedjan. Det innebär
+              att innehållet kan finnas kvar i blockkedjans historik, men det
+              kommer inte längre att vara tillgängligt eller synligt för andra
+              användare på HKLO-bloggen.
             </p>
           </motion.div>
         </motion.div>

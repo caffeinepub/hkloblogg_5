@@ -25,6 +25,7 @@ import {
   useDeleteComment,
   useEditComment,
   useIsAdmin,
+  useIsModerator,
   useLikeComment,
   useListComments,
   useMyLikedComments,
@@ -57,6 +58,7 @@ interface CommentItemProps {
   likedSet: Set<string>;
   myPrincipal: string | undefined;
   isAdmin: boolean;
+  isModerator: boolean;
   postId: string;
   depth: number;
   index: number;
@@ -69,6 +71,7 @@ function CommentItem({
   likedSet,
   myPrincipal,
   isAdmin,
+  isModerator,
   postId,
   depth,
   index,
@@ -79,6 +82,7 @@ function CommentItem({
   const [editing, setEditing] = useState(false);
   const [editBody, setEditBody] = useState(comment.body);
   const [replyStagedFiles, setReplyStagedFiles] = useState<StagedFile[]>([]);
+  const [likeAnimating, setLikeAnimating] = useState(false);
 
   const { actor } = useActor();
   const {
@@ -111,8 +115,8 @@ function CommentItem({
   const isLiked = likedSet.has(comment.id);
   const isAuthor =
     !!myPrincipal && myPrincipal === comment.authorPrincipal.toString();
-  const canEdit = isAuthor;
-  const canDelete = isAuthor || isAdmin;
+  const canEdit = isAuthor || isModerator;
+  const canDelete = isAuthor || isAdmin || isModerator;
 
   // Only render replies up to depth 3
   const replies =
@@ -121,6 +125,9 @@ function CommentItem({
   const handleLike = async () => {
     try {
       await likeComment.mutateAsync({ commentId: comment.id, postId });
+      setLikeAnimating(true);
+      setTimeout(() => setLikeAnimating(false), 600);
+      toast.success("Gillat! ❤️");
     } catch {
       toast.error("Kunde inte gilla kommentaren.");
     }
@@ -300,7 +307,7 @@ function CommentItem({
               data-ocid={`comments.like.button.${index}`}
               onClick={handleLike}
               disabled={likeComment.isPending}
-              className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border transition-all ${
+              className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border transition-all ${likeAnimating ? "like-pulse " : ""}${
                 isLiked
                   ? "bg-rose-50 border-rose-200 text-rose-600 hover:bg-rose-100"
                   : "border-border text-muted-foreground hover:text-foreground hover:border-foreground/30"
@@ -430,6 +437,7 @@ function CommentItem({
           likedSet={likedSet}
           myPrincipal={myPrincipal}
           isAdmin={isAdmin}
+          isModerator={isModerator ?? false}
           postId={postId}
           depth={depth + 1}
           index={index * 100 + i + 1}
@@ -447,6 +455,7 @@ interface CommentsSectionProps {
 export default function CommentsSection({ postId }: CommentsSectionProps) {
   const { identity } = useInternetIdentity();
   const { data: isAdmin } = useIsAdmin();
+  const { data: isModerator } = useIsModerator();
   const { data: comments, isLoading } = useListComments(postId);
   const { data: likedComments } = useMyLikedComments();
   const createComment = useCreateComment();
@@ -465,7 +474,7 @@ export default function CommentsSection({ postId }: CommentsSectionProps) {
   const likedSet = new Set(likedComments ?? []);
 
   // Top-level comments only
-  const topLevel = (comments ?? []).filter((c) => c.parentId === null);
+  const topLevel = (comments ?? []).filter((c) => !c.parentId);
   const allComments = comments ?? [];
 
   const handleSubmit = async () => {
@@ -485,8 +494,7 @@ export default function CommentsSection({ postId }: CommentsSectionProps) {
           const newComment = allCommentsList
             .filter(
               (c) =>
-                c.parentId === null &&
-                c.authorPrincipal.toString() === myPrincipal,
+                !c.parentId && c.authorPrincipal.toString() === myPrincipal,
             )
             .sort((a, b) => Number(b.createdAt) - Number(a.createdAt))[0];
 
@@ -597,6 +605,7 @@ export default function CommentsSection({ postId }: CommentsSectionProps) {
               likedSet={likedSet}
               myPrincipal={myPrincipal}
               isAdmin={isAdmin ?? false}
+              isModerator={isModerator ?? false}
               postId={postId}
               depth={0}
               index={i + 1}

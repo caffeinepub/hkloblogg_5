@@ -74,6 +74,21 @@ export interface Notification {
     createdAt: Time;
     read: boolean;
 }
+export interface CategorySchedule {
+    enabled: boolean;
+    weekday: bigint;
+    hour: bigint;
+    lastRunAt: bigint | null;
+}
+export interface CleanupLog {
+    id: bigint;
+    categoryId: string;
+    categoryName: string;
+    ranAt: Time;
+    postsDeleted: bigint;
+    commentsDeleted: bigint;
+    mediaDeleted: bigint;
+}
 export interface backendInterface {
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
     blockUser(user: Principal): Promise<void>;
@@ -103,6 +118,9 @@ export interface backendInterface {
     getPost(postId: string): Promise<Post | null>;
     getUser(user: Principal): Promise<UserProfile | null>;
     isCallerAdmin(): Promise<boolean>;
+    isCallerModerator(): Promise<boolean>;
+    isUserModerator(user: Principal): Promise<boolean>;
+    listModerators(): Promise<Array<Principal>>;
     likeComment(commentId: string): Promise<void>;
     likePost(postId: string): Promise<void>;
     listCategories(): Promise<Array<Category>>;
@@ -115,6 +133,8 @@ export interface backendInterface {
     register(alias: string): Promise<void>;
     search(searchQuery: string): Promise<SearchResult>;
     setRole(user: Principal, role: UserRole): Promise<void>;
+    assignModerator(user: Principal): Promise<void>;
+    revokeModerator(user: Principal): Promise<void>;
     unblockUser(user: Principal): Promise<void>;
     uploadMedia(postId: bigint | null, commentId: bigint | null, fileType: string, fileName: string, fileSize: bigint, blobKey: string): Promise<bigint>;
     followUser(userToFollow: Principal): Promise<void>;
@@ -132,4 +152,7 @@ export interface backendInterface {
     markNotificationRead(notifId: bigint): Promise<void>;
     markAllNotificationsRead(): Promise<void>;
     deleteNotification(notifId: bigint): Promise<void>;
+    setCategorySchedule(categoryId: string, enabled: boolean, weekday: bigint, hour: bigint): Promise<void>;
+    getCategorySchedule(categoryId: string): Promise<CategorySchedule | null>;
+    listCleanupLogs(categoryId: string | null): Promise<Array<CleanupLog>>;
 }

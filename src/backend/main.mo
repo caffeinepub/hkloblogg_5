@@ -9,6 +9,8 @@ import MixinAuthorization "authorization/MixinAuthorization";
 import Iter "mo:core/Iter";
 import Storage "blob-storage/Storage";
 import MixinStorage "blob-storage/Mixin";
+import Nat64 "mo:core/Nat64";
+import Int "mo:core/Int";
 
 
 
@@ -90,6 +92,25 @@ actor {
     read : Bool;
   };
 
+  // ====== SCHEDULED CLEANUP TYPES ======
+
+  type CategorySchedule = {
+    enabled : Bool;
+    weekday : Nat;    // 0=Monday, 1=Tuesday, ..., 6=Sunday
+    hour : Nat;       // 0-23 UTC
+    lastRunAt : ?Time.Time;
+  };
+
+  type CleanupLog = {
+    id : Nat;
+    categoryId : Text;
+    categoryName : Text;
+    ranAt : Time.Time;
+    postsDeleted : Nat;
+    commentsDeleted : Nat;
+    mediaDeleted : Nat;
+  };
+
   let accessControlState = AccessControl.initState();
   include MixinAuthorization(accessControlState);
 
@@ -105,13 +126,19 @@ actor {
   var mediaFiles = Map.empty<Nat, MediaFile>();
   var nextMediaId = 1;
 
-  // Follow state
-  var userFollows = Map.empty<Principal, List.List<Principal>>();  // caller -> list of followed users
-  var postFollows = Map.empty<Text, List.List<Principal>>();       // postId -> list of followers
+  // Moderator set: principals with moderator privileges
+  var moderatorSet = Map.empty<Principal, Bool>();
 
-  // Notification state
+  var userFollows = Map.empty<Principal, List.List<Principal>>();
+  var postFollows = Map.empty<Text, List.List<Principal>>();
+
   var notifications = Map.empty<Nat, Notification>();
   var nextNotifId = 1;
+
+  // Scheduled cleanup state
+  var categorySchedules = Map.empty<Text, CategorySchedule>();
+  var cleanupLogs = Map.empty<Nat, CleanupLog>();
+  var nextLogId = 1;
 
   func requireActiveUser(caller : Principal) : UserProfile {
     switch (userProfiles.get(caller)) {
@@ -123,7 +150,15 @@ actor {
     };
   };
 
-  // Internal helper: notify all post followers except the triggering user
+  // Returns true if caller is superadmin or moderator
+  func isModeratorOrAdmin(caller : Principal) : Bool {
+    if (AccessControl.isAdmin(accessControlState, caller)) { return true };
+    switch (moderatorSet.get(caller)) {
+      case (?true) { true };
+      case (_) { false };
+    };
+  };
+
   func notifyPostFollowers(postId : Text, triggerPrincipal : Principal, event : NotificationEvent) {
     switch (postFollows.get(postId)) {
       case (null) {};
@@ -150,32 +185,24 @@ actor {
   func deleteUserContent(user : Principal) {
     let userPostIds = List.empty<Text>();
     for ((postId, post) in posts.entries()) {
-      if (post.authorPrincipal == user) {
-        userPostIds.add(postId);
-      };
+      if (post.authorPrincipal == user) { userPostIds.add(postId) };
     };
-
     for (postId in userPostIds.toArray().vals()) {
       posts.remove(postId);
       postLikes.remove(postId);
       postFollows.remove(postId);
       let postCommentIds = List.empty<Text>();
       for ((cid, c) in comments.entries()) {
-        if (c.postId == postId) {
-          postCommentIds.add(cid);
-        };
+        if (c.postId == postId) { postCommentIds.add(cid) };
       };
       for (cid in postCommentIds.toArray().vals()) {
         comments.remove(cid);
         commentLikes.remove(cid);
       };
     };
-
     let userCommentIds = List.empty<Text>();
     for ((cid, c) in comments.entries()) {
-      if (c.authorPrincipal == user) {
-        userCommentIds.add(cid);
-      };
+      if (c.authorPrincipal == user) { userCommentIds.add(cid) };
     };
     for (cid in userCommentIds.toArray().vals()) {
       comments.remove(cid);
@@ -192,7 +219,6 @@ actor {
         commentLikes.remove(childId);
       };
     };
-
     for ((postId, likes) in postLikes.entries()) {
       let filtered = likes.filter(func(p) { p != user });
       postLikes.add(postId, filtered);
@@ -201,14 +227,11 @@ actor {
       let filtered = likes.filter(func(p) { p != user });
       commentLikes.add(commentId, filtered);
     };
-
-    // Remove user from all category allowed lists
     for ((catId, allowedList) in categoryAllowedUsers.entries()) {
       let filtered = allowedList.filter(func(p) { p != user });
       categoryAllowedUsers.add(catId, filtered);
     };
-
-    // Remove user from follow state
+    moderatorSet.remove(user);
     userFollows.remove(user);
     for ((follower, followedList) in userFollows.entries()) {
       let filtered = followedList.filter(func(p) { p != user });
@@ -218,8 +241,6 @@ actor {
       let filtered = followerList.filter(func(p) { p != user });
       postFollows.add(pid, filtered);
     };
-
-    // Remove notifications for/by the deleted user
     let toDeleteNotifs = List.empty<Nat>();
     for ((nid, notif) in notifications.entries()) {
       if (notif.recipientPrincipal == user or notif.triggerPrincipal == user) {
@@ -229,6 +250,110 @@ actor {
     for (nid in toDeleteNotifs.toArray().vals()) {
       notifications.remove(nid);
     };
+  };
+
+  // Delete all posts, comments, and media for a given category
+  func deleteCategoryContent(categoryId : Text) : (Nat, Nat, Nat) {
+    var postsDeleted = 0;
+    var commentsDeleted = 0;
+    var mediaDeleted = 0;
+
+    // Collect post IDs for this category
+    let categoryPostIds = List.empty<Text>();
+    for ((postId, post) in posts.entries()) {
+      if (post.categoryId == categoryId) { categoryPostIds.add(postId) };
+    };
+
+    for (postId in categoryPostIds.toArray().vals()) {
+      // Delete all comments for this post
+      let postCommentIds = List.empty<Text>();
+      for ((cid, c) in comments.entries()) {
+        if (c.postId == postId) { postCommentIds.add(cid) };
+      };
+      for (cid in postCommentIds.toArray().vals()) {
+        comments.remove(cid);
+        commentLikes.remove(cid);
+        commentsDeleted += 1;
+      };
+
+      // Delete media for this post
+      let postMediaIds = List.empty<Nat>();
+      for ((mid, m) in mediaFiles.entries()) {
+        switch (m.postId) {
+          case (?pid) { if (pid.toText() == postId) { postMediaIds.add(mid) } };
+          case (null) {};
+        };
+      };
+      for (mid in postMediaIds.toArray().vals()) {
+        mediaFiles.remove(mid);
+        mediaDeleted += 1;
+      };
+
+      // Delete notifications for this post
+      let toDeleteNotifs = List.empty<Nat>();
+      for ((nid, notif) in notifications.entries()) {
+        if (notif.postId == postId) { toDeleteNotifs.add(nid) };
+      };
+      for (nid in toDeleteNotifs.toArray().vals()) {
+        notifications.remove(nid);
+      };
+
+      posts.remove(postId);
+      postLikes.remove(postId);
+      postFollows.remove(postId);
+      postsDeleted += 1;
+    };
+
+    (postsDeleted, commentsDeleted, mediaDeleted);
+  };
+
+  // Check and run scheduled cleanups -- called by system timer
+  func runScheduledCleanup() : async () {
+    let nowNs : Int = Time.now();
+    let nowSec : Int = nowNs / 1_000_000_000;
+    let daysSinceEpoch : Int = nowSec / 86400;
+    // Jan 1 1970 was a Thursday = weekday 3 in Mon=0 system
+    let currentWeekday : Nat = Int.abs((daysSinceEpoch + 3) % 7);
+    let currentHour : Nat = Int.abs((nowSec / 3600) % 24);
+    let twelveHoursNs : Int = 12 * 3600 * 1_000_000_000;
+
+    for ((categoryId, schedule) in categorySchedules.entries()) {
+      if (not schedule.enabled) { () } else {
+        let weekdayMatch = schedule.weekday == currentWeekday;
+        let hourMatch = schedule.hour == currentHour;
+        let notRunRecently = switch (schedule.lastRunAt) {
+          case (null) { true };
+          case (?lastRun) { (nowNs - lastRun) > twelveHoursNs };
+        };
+        if (weekdayMatch and hourMatch and notRunRecently) {
+          let categoryName = switch (categories.get(categoryId)) {
+            case (?cat) { cat.name };
+            case (null) { categoryId };
+          };
+          let (postsDeleted, commentsDeleted, mediaDeleted) = deleteCategoryContent(categoryId);
+          let logEntry : CleanupLog = {
+            id = nextLogId;
+            categoryId;
+            categoryName;
+            ranAt = nowNs;
+            postsDeleted;
+            commentsDeleted;
+            mediaDeleted;
+          };
+          cleanupLogs.add(nextLogId, logEntry);
+          nextLogId += 1;
+          categorySchedules.add(categoryId, { schedule with lastRunAt = ?nowNs });
+        };
+      };
+    };
+  };
+
+  // System timer: fires every hour (3_600_000_000_000 ns)
+  system func timer(setGlobalTimer : Nat64 -> ()) : async () {
+    let oneHourNs : Int = 3_600_000_000_000;
+    let nextNs : Int = Time.now() + oneHourNs;
+    setGlobalTimer(Nat64.fromNat(Int.abs(nextNs)));
+    await runScheduledCleanup();
   };
 
   public query ({ caller }) func getMyProfile() : async ?UserProfile {
@@ -256,7 +381,6 @@ actor {
     if (not (AccessControl.isAdmin(accessControlState, caller))) {
       Runtime.trap("Unauthorized: Only superadmin can list users with principals");
     };
-
     let result = List.empty<UserWithPrincipal>();
     for ((principal, profile) in userProfiles.entries()) {
       result.add({ principal; profile });
@@ -266,13 +390,9 @@ actor {
 
   public query ({ caller }) func listCategories() : async [Category] {
     switch (userProfiles.get(caller)) {
-      case (null) {
-        Runtime.trap("Unauthorized: Only authenticated users can list categories");
-      };
+      case (null) { Runtime.trap("Unauthorized: Only authenticated users can list categories") };
       case (?profile) {
-        if (profile.blocked) {
-          Runtime.trap("Unauthorized: Blocked users cannot list categories");
-        };
+        if (profile.blocked) { Runtime.trap("Unauthorized: Blocked users cannot list categories") };
       };
     };
     let isAdmin = AccessControl.isAdmin(accessControlState, caller);
@@ -294,51 +414,44 @@ actor {
   };
 
   public shared ({ caller }) func register(alias : Text) : async () {
-    if (userProfiles.containsKey(caller)) {
-      Runtime.trap("User already registered");
-    };
-
+    if (userProfiles.containsKey(caller)) { Runtime.trap("User already registered") };
     for ((_, profile) in userProfiles.entries()) {
-      if (profile.alias == alias) {
-        Runtime.trap("Alias already taken");
-      };
+      if (profile.alias == alias) { Runtime.trap("Alias already taken") };
     };
-
     let role : UserRole = if (not isFirstUserRegistered) { #admin } else { #user };
-
     let profile : UserProfile = {
-      alias;
-      role;
-      blocked = false;
-      registeredAt = Time.now();
+      alias; role; blocked = false; registeredAt = Time.now();
     };
-
     userProfiles.add(caller, profile);
-    AccessControl.assignRole(accessControlState, caller, caller, role);
-
-    if (not isFirstUserRegistered) {
-      isFirstUserRegistered := true;
-    };
+    if (not isFirstUserRegistered) { isFirstUserRegistered := true };
   };
 
   public shared ({ caller }) func blockUser(user : Principal) : async () {
-    if (not (AccessControl.isAdmin(accessControlState, caller))) {
-      Runtime.trap("Unauthorized: Only superadmin can block users");
+    if (not isModeratorOrAdmin(caller)) {
+      Runtime.trap("Unauthorized: Only superadmin or moderator can block users");
     };
-
     switch (userProfiles.get(user)) {
       case (null) { Runtime.trap("User not found") };
       case (?profile) {
+        // Moderators cannot block admins or other moderators
+        if (not AccessControl.isAdmin(accessControlState, caller)) {
+          if (profile.role == #admin) {
+            Runtime.trap("Unauthorized: Moderators cannot block admins");
+          };
+          switch (moderatorSet.get(user)) {
+            case (?true) { Runtime.trap("Unauthorized: Moderators cannot block other moderators") };
+            case (_) {};
+          };
+        };
         userProfiles.add(user, { profile with blocked = true });
       };
     };
   };
 
   public shared ({ caller }) func unblockUser(user : Principal) : async () {
-    if (not (AccessControl.isAdmin(accessControlState, caller))) {
-      Runtime.trap("Unauthorized: Only superadmin can unblock users");
+    if (not isModeratorOrAdmin(caller)) {
+      Runtime.trap("Unauthorized: Only superadmin or moderator can unblock users");
     };
-
     switch (userProfiles.get(user)) {
       case (null) { Runtime.trap("User not found") };
       case (?profile) {
@@ -351,7 +464,6 @@ actor {
     if (not (AccessControl.isAdmin(accessControlState, caller))) {
       Runtime.trap("Unauthorized: Only superadmin can set roles");
     };
-
     switch (userProfiles.get(user)) {
       case (null) { Runtime.trap("User not found") };
       case (?profile) {
@@ -361,15 +473,51 @@ actor {
     };
   };
 
+  // Assign moderator privileges to a user (superadmin only)
+  public shared ({ caller }) func assignModerator(user : Principal) : async () {
+    if (not (AccessControl.isAdmin(accessControlState, caller))) {
+      Runtime.trap("Unauthorized: Only superadmin can assign moderators");
+    };
+    if (not userProfiles.containsKey(user)) { Runtime.trap("User not found") };
+    moderatorSet.add(user, true);
+  };
+
+  // Revoke moderator privileges
+  public shared ({ caller }) func revokeModerator(user : Principal) : async () {
+    if (not (AccessControl.isAdmin(accessControlState, caller))) {
+      Runtime.trap("Unauthorized: Only superadmin can revoke moderators");
+    };
+    if (not userProfiles.containsKey(user)) { Runtime.trap("User not found") };
+    moderatorSet.remove(user);
+  };
+
+  // Check if the caller has moderator privileges (or is admin)
+  public query ({ caller }) func isCallerModerator() : async Bool {
+    isModeratorOrAdmin(caller);
+  };
+
+  // Check if a specific user is a moderator
+  public query ({ caller }) func isUserModerator(user : Principal) : async Bool {
+    let _ = requireActiveUser(caller);
+    switch (moderatorSet.get(user)) {
+      case (?true) { true };
+      case (_) { false };
+    };
+  };
+
+  // List all moderator principals (superadmin only)
+  public query ({ caller }) func listModerators() : async [Principal] {
+    if (not (AccessControl.isAdmin(accessControlState, caller))) {
+      Runtime.trap("Unauthorized: Only superadmin can list moderators");
+    };
+    moderatorSet.keys().toArray();
+  };
+
   public shared ({ caller }) func deleteUser(user : Principal) : async () {
     if (not (AccessControl.isAdmin(accessControlState, caller))) {
       Runtime.trap("Unauthorized: Only superadmin can delete users");
     };
-
-    if (not userProfiles.containsKey(user)) {
-      Runtime.trap("User not found");
-    };
-
+    if (not userProfiles.containsKey(user)) { Runtime.trap("User not found") };
     deleteUserContent(user);
     userProfiles.remove(user);
     AccessControl.assignRole(accessControlState, caller, user, #guest);
@@ -379,11 +527,7 @@ actor {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
       Runtime.trap("Unauthorized: Only registered users can delete their account");
     };
-
-    if (not userProfiles.containsKey(caller)) {
-      Runtime.trap("User not found");
-    };
-
+    if (not userProfiles.containsKey(caller)) { Runtime.trap("User not found") };
     deleteUserContent(caller);
     userProfiles.remove(caller);
     AccessControl.assignRole(accessControlState, caller, caller, #guest);
@@ -393,15 +537,8 @@ actor {
     if (not (AccessControl.isAdmin(accessControlState, caller))) {
       Runtime.trap("Unauthorized: Only superadmin can create categories");
     };
-
     let id = Time.now().toText();
-    let category : Category = {
-      id;
-      name;
-      createdBy = caller;
-      createdAt = Time.now();
-    };
-
+    let category : Category = { id; name; createdBy = caller; createdAt = Time.now() };
     categories.add(id, category);
   };
 
@@ -409,30 +546,19 @@ actor {
     if (not (AccessControl.isAdmin(accessControlState, caller))) {
       Runtime.trap("Unauthorized: Only superadmin can delete categories");
     };
-
-    if (not categories.containsKey(id)) {
-      Runtime.trap("Category not found");
-    };
-
+    if (not categories.containsKey(id)) { Runtime.trap("Category not found") };
     categories.remove(id);
     categoryHidden.remove(id);
     categoryAllowedUsers.remove(id);
+    categorySchedules.remove(id);
   };
 
   public shared ({ caller }) func toggleCategoryHidden(id : Text, hidden : Bool) : async () {
     if (not (AccessControl.isAdmin(accessControlState, caller))) {
       Runtime.trap("Unauthorized: Only superadmin can toggle category visibility");
     };
-
-    if (not categories.containsKey(id)) {
-      Runtime.trap("Category not found");
-    };
-
-    if (hidden) {
-      categoryHidden.add(id, true);
-    } else {
-      categoryHidden.remove(id);
-    };
+    if (not categories.containsKey(id)) { Runtime.trap("Category not found") };
+    if (hidden) { categoryHidden.add(id, true) } else { categoryHidden.remove(id) };
   };
 
   public query ({ caller }) func getHiddenCategoryIds() : async [Text] {
@@ -446,16 +572,11 @@ actor {
     if (not (AccessControl.isAdmin(accessControlState, caller))) {
       Runtime.trap("Unauthorized: Only superadmin can manage category access");
     };
-
-    if (not categories.containsKey(categoryId)) {
-      Runtime.trap("Category not found");
-    };
-
+    if (not categories.containsKey(categoryId)) { Runtime.trap("Category not found") };
     let existingList = switch (categoryAllowedUsers.get(categoryId)) {
       case (null) { List.empty<Principal>() };
       case (?list) { list };
     };
-
     let alreadyAdded = existingList.any(func(p) { p == user });
     if (not alreadyAdded) {
       existingList.add(user);
@@ -467,11 +588,7 @@ actor {
     if (not (AccessControl.isAdmin(accessControlState, caller))) {
       Runtime.trap("Unauthorized: Only superadmin can manage category access");
     };
-
-    if (not categories.containsKey(categoryId)) {
-      Runtime.trap("Category not found");
-    };
-
+    if (not categories.containsKey(categoryId)) { Runtime.trap("Category not found") };
     switch (categoryAllowedUsers.get(categoryId)) {
       case (null) {};
       case (?list) {
@@ -485,52 +602,77 @@ actor {
     if (not (AccessControl.isAdmin(accessControlState, caller))) {
       Runtime.trap("Unauthorized: Only superadmin can view category access lists");
     };
-
-    if (not categories.containsKey(categoryId)) {
-      Runtime.trap("Category not found");
-    };
-
+    if (not categories.containsKey(categoryId)) { Runtime.trap("Category not found") };
     switch (categoryAllowedUsers.get(categoryId)) {
       case (null) { [] };
       case (?list) { list.toArray() };
     };
   };
 
+  // ====== SCHEDULED CLEANUP API ======
+
+  public shared ({ caller }) func setCategorySchedule(
+    categoryId : Text,
+    enabled : Bool,
+    weekday : Nat,
+    hour : Nat
+  ) : async () {
+    if (not (AccessControl.isAdmin(accessControlState, caller))) {
+      Runtime.trap("Unauthorized: Only superadmin can set category schedules");
+    };
+    if (not categories.containsKey(categoryId)) { Runtime.trap("Category not found") };
+    if (weekday > 6) { Runtime.trap("Weekday must be 0-6") };
+    if (hour > 23) { Runtime.trap("Hour must be 0-23") };
+    let existing = categorySchedules.get(categoryId);
+    let lastRunAt = switch (existing) {
+      case (?s) { s.lastRunAt };
+      case (null) { null };
+    };
+    categorySchedules.add(categoryId, { enabled; weekday; hour; lastRunAt });
+  };
+
+  public query ({ caller }) func getCategorySchedule(categoryId : Text) : async ?CategorySchedule {
+    if (not (AccessControl.isAdmin(accessControlState, caller))) {
+      Runtime.trap("Unauthorized: Only superadmin can view category schedules");
+    };
+    categorySchedules.get(categoryId);
+  };
+
+  public query ({ caller }) func listCleanupLogs(categoryId : ?Text) : async [CleanupLog] {
+    if (not (AccessControl.isAdmin(accessControlState, caller))) {
+      Runtime.trap("Unauthorized: Only superadmin can view cleanup logs");
+    };
+    switch (categoryId) {
+      case (null) { cleanupLogs.values().toArray() };
+      case (?catId) {
+        cleanupLogs.values().toArray().filter(func(log) { log.categoryId == catId })
+      };
+    };
+  };
+
+  // ====== END SCHEDULED CLEANUP API ======
+
   public shared ({ caller }) func createPost(title : Text, body : Text, categoryId : Text) : async () {
     let _ = requireActiveUser(caller);
-
-    if (not categories.containsKey(categoryId)) {
-      Runtime.trap("Category not found");
-    };
-
+    if (not categories.containsKey(categoryId)) { Runtime.trap("Category not found") };
     let postId = Time.now().toText();
     let post : Post = {
-      id = postId;
-      title;
-      body;
-      categoryId;
+      id = postId; title; body; categoryId;
       authorPrincipal = caller;
-      createdAt = Time.now();
-      updatedAt = Time.now();
-      pinned = false;
-      likeCount = 0;
+      createdAt = Time.now(); updatedAt = Time.now();
+      pinned = false; likeCount = 0;
     };
-
     posts.add(postId, post);
   };
 
   public shared ({ caller }) func editPost(postId : Text, title : Text, body : Text, categoryId : Text) : async () {
     let _ = requireActiveUser(caller);
-
-    if (not categories.containsKey(categoryId)) {
-      Runtime.trap("Category not found");
-    };
-
+    if (not categories.containsKey(categoryId)) { Runtime.trap("Category not found") };
     switch (posts.get(postId)) {
       case (null) { Runtime.trap("Post not found") };
       case (?existingPost) {
-        if (existingPost.authorPrincipal != caller and not AccessControl.isAdmin(accessControlState, caller)) {
-          Runtime.trap("Unauthorized: Only author or superadmin can edit");
+        if (existingPost.authorPrincipal != caller and not isModeratorOrAdmin(caller)) {
+          Runtime.trap("Unauthorized: Only author, moderator, or superadmin can edit");
         };
         posts.add(postId, { existingPost with title; body; categoryId; updatedAt = Time.now() });
       };
@@ -541,8 +683,8 @@ actor {
     switch (posts.get(postId)) {
       case (null) { Runtime.trap("Post not found") };
       case (?post) {
-        if (post.authorPrincipal != caller and not AccessControl.isAdmin(accessControlState, caller)) {
-          Runtime.trap("Unauthorized: Only author or superadmin can delete");
+        if (post.authorPrincipal != caller and not isModeratorOrAdmin(caller)) {
+          Runtime.trap("Unauthorized: Only author, moderator, or superadmin can delete");
         };
         posts.remove(postId);
         postLikes.remove(postId);
@@ -555,7 +697,6 @@ actor {
           comments.remove(cid);
           commentLikes.remove(cid);
         };
-        // Remove notifications for this post
         let toDeleteNotifs = List.empty<Nat>();
         for ((nid, notif) in notifications.entries()) {
           if (notif.postId == postId) { toDeleteNotifs.add(nid) };
@@ -571,29 +712,20 @@ actor {
     if (not (AccessControl.isAdmin(accessControlState, caller))) {
       Runtime.trap("Unauthorized: Only superadmin can pin posts");
     };
-
     switch (posts.get(postId)) {
       case (null) { Runtime.trap("Post not found") };
-      case (?existingPost) {
-        posts.add(postId, { existingPost with pinned });
-      };
+      case (?existingPost) { posts.add(postId, { existingPost with pinned }) };
     };
   };
 
   public shared ({ caller }) func likePost(postId : Text) : async () {
     let _ = requireActiveUser(caller);
-
-    if (not posts.containsKey(postId)) {
-      Runtime.trap("Post not found");
-    };
-
+    if (not posts.containsKey(postId)) { Runtime.trap("Post not found") };
     let existingLikes = switch (postLikes.get(postId)) {
       case (null) { List.empty<Principal>() };
       case (?likes) { likes };
     };
-
     let alreadyLiked = existingLikes.any(func(p) { p == caller });
-
     if (alreadyLiked) {
       let filtered = existingLikes.filter(func(p) { p != caller });
       postLikes.add(postId, filtered);
@@ -601,17 +733,13 @@ actor {
       existingLikes.add(caller);
       postLikes.add(postId, existingLikes);
     };
-
     let likeCount = switch (postLikes.get(postId)) {
       case (null) { 0 };
       case (?likes) { likes.size() };
     };
-
     switch (posts.get(postId)) {
       case (null) { Runtime.trap("Post not found") };
-      case (?post) {
-        posts.add(postId, { post with likeCount });
-      };
+      case (?post) { posts.add(postId, { post with likeCount }) };
     };
   };
 
@@ -622,7 +750,6 @@ actor {
 
   public query ({ caller }) func listPosts(categoryId : ?Text) : async [Post] {
     let _ = requireActiveUser(caller);
-
     let allPosts = posts.values().toArray();
     switch (categoryId) {
       case (null) { allPosts };
@@ -632,59 +759,39 @@ actor {
 
   public query ({ caller }) func listPostsByAuthor(alias : Text) : async [Post] {
     let _ = requireActiveUser(caller);
-
     let authorPrincipalOpt = userProfiles.entries().find(func((_, profile)) { profile.alias == alias });
-
     let authorPrincipal = switch (authorPrincipalOpt) {
       case (null) { Runtime.trap("Author not found") };
       case (?(principal, _)) { principal };
     };
-
     posts.values().toArray().filter(func(post) { post.authorPrincipal == authorPrincipal });
   };
 
   public query ({ caller }) func getMyLikedPosts() : async [Text] {
     let _ = requireActiveUser(caller);
-
     let likedPosts = List.empty<Text>();
     for ((postId, likes) in postLikes.entries()) {
-      if (likes.any(func(p) { p == caller })) {
-        likedPosts.add(postId);
-      };
+      if (likes.any(func(p) { p == caller })) { likedPosts.add(postId) };
     };
     likedPosts.toArray();
   };
 
   public shared ({ caller }) func createComment(postId : Text, body : Text, parentId : ?Text) : async () {
     let _ = requireActiveUser(caller);
-
-    if (not posts.containsKey(postId)) {
-      Runtime.trap("Post not found");
-    };
-
+    if (not posts.containsKey(postId)) { Runtime.trap("Post not found") };
     switch (parentId) {
       case (?pid) {
-        if (not comments.containsKey(pid)) {
-          Runtime.trap("Parent comment not found");
-        };
+        if (not comments.containsKey(pid)) { Runtime.trap("Parent comment not found") };
       };
       case (null) {};
     };
-
     let commentId = Time.now().toText() # "-" # caller.toText();
     let comment : Comment = {
-      id = commentId;
-      postId;
-      parentId;
-      body;
+      id = commentId; postId; parentId; body;
       authorPrincipal = caller;
-      createdAt = Time.now();
-      likeCount = 0;
+      createdAt = Time.now(); likeCount = 0;
     };
-
     comments.add(commentId, comment);
-
-    // Notify post followers
     let event : NotificationEvent = switch (parentId) {
       case (?_) { #NewReply };
       case (null) { #NewComment };
@@ -694,12 +801,11 @@ actor {
 
   public shared ({ caller }) func editComment(commentId : Text, body : Text) : async () {
     let _ = requireActiveUser(caller);
-
     switch (comments.get(commentId)) {
       case (null) { Runtime.trap("Comment not found") };
       case (?c) {
-        if (c.authorPrincipal != caller) {
-          Runtime.trap("Unauthorized: Only author can edit comment");
+        if (c.authorPrincipal != caller and not isModeratorOrAdmin(caller)) {
+          Runtime.trap("Unauthorized: Only author, moderator, or superadmin can edit comment");
         };
         comments.add(commentId, { c with body });
       };
@@ -710,8 +816,8 @@ actor {
     switch (comments.get(commentId)) {
       case (null) { Runtime.trap("Comment not found") };
       case (?c) {
-        if (c.authorPrincipal != caller and not AccessControl.isAdmin(accessControlState, caller)) {
-          Runtime.trap("Unauthorized: Only author or superadmin can delete comment");
+        if (c.authorPrincipal != caller and not isModeratorOrAdmin(caller)) {
+          Runtime.trap("Unauthorized: Only author, moderator, or superadmin can delete comment");
         };
         comments.remove(commentId);
         commentLikes.remove(commentId);
@@ -732,18 +838,12 @@ actor {
 
   public shared ({ caller }) func likeComment(commentId : Text) : async () {
     let _ = requireActiveUser(caller);
-
-    if (not comments.containsKey(commentId)) {
-      Runtime.trap("Comment not found");
-    };
-
+    if (not comments.containsKey(commentId)) { Runtime.trap("Comment not found") };
     let existingLikes = switch (commentLikes.get(commentId)) {
       case (null) { List.empty<Principal>() };
       case (?likes) { likes };
     };
-
     let alreadyLiked = existingLikes.any(func(p) { p == caller });
-
     if (alreadyLiked) {
       let filtered = existingLikes.filter(func(p) { p != caller });
       commentLikes.add(commentId, filtered);
@@ -751,17 +851,13 @@ actor {
       existingLikes.add(caller);
       commentLikes.add(commentId, existingLikes);
     };
-
     let likeCount = switch (commentLikes.get(commentId)) {
       case (null) { 0 };
       case (?likes) { likes.size() };
     };
-
     switch (comments.get(commentId)) {
       case (null) { Runtime.trap("Comment not found") };
-      case (?c) {
-        comments.add(commentId, { c with likeCount });
-      };
+      case (?c) { comments.add(commentId, { c with likeCount }) };
     };
   };
 
@@ -772,25 +868,19 @@ actor {
 
   public query ({ caller }) func getMyLikedComments() : async [Text] {
     let _ = requireActiveUser(caller);
-
     let liked = List.empty<Text>();
     for ((commentId, likes) in commentLikes.entries()) {
-      if (likes.any(func(p) { p == caller })) {
-        liked.add(commentId);
-      };
+      if (likes.any(func(p) { p == caller })) { liked.add(commentId) };
     };
     liked.toArray();
   };
 
   public query ({ caller }) func search(searchQuery : Text) : async SearchResult {
     let _ = requireActiveUser(caller);
-
     let lq = searchQuery.toLower();
-
     let matchedPosts = posts.values().toArray().filter(func(p) {
       p.title.toLower().contains(#text lq) or p.body.toLower().contains(#text lq)
     });
-
     let matchedComments = comments.values().toArray().filter(func(c) {
       if (c.body.toLower().contains(#text lq)) { return true };
       switch (userProfiles.get(c.authorPrincipal)) {
@@ -798,7 +888,6 @@ actor {
         case (null) { false };
       };
     });
-
     { posts = matchedPosts; comments = matchedComments };
   };
 
@@ -806,41 +895,21 @@ actor {
 
   public shared ({ caller }) func uploadMedia(postId : ?Nat, commentId : ?Nat, fileType : Text, fileName : Text, fileSize : Nat, blobKey : Text) : async Nat {
     let _ = requireActiveUser(caller);
-
     let maxSize = if (fileType == "image") { 15_728_640 } else if (fileType == "video") {
-      31_457_280;
+      104_857_600;
     } else { Runtime.trap("Invalid file type") };
-
-    if (fileSize > maxSize) {
-      Runtime.trap("File size exceeds limit");
-    };
-
+    if (fileSize > maxSize) { Runtime.trap("File size exceeds limit") };
     let mediaId = nextMediaId;
     nextMediaId += 1;
-
     let media : MediaFile = {
-      id = mediaId;
-      ownerId = caller;
-      postId;
-      commentId;
-      fileType;
-      fileName;
-      fileSize;
-      blobKey;
-      uploadedAt = Time.now();
+      id = mediaId; ownerId = caller; postId; commentId;
+      fileType; fileName; fileSize; blobKey; uploadedAt = Time.now();
     };
-
     mediaFiles.add(mediaId, media);
-
-    // Notify post followers when media is uploaded to a post
     switch (postId) {
-      case (?pid) {
-        let pidText = pid.toText();
-        notifyPostFollowers(pidText, caller, #NewMedia);
-      };
+      case (?pid) { notifyPostFollowers(pid.toText(), caller, #NewMedia) };
       case (null) {};
     };
-
     mediaId;
   };
 
@@ -858,8 +927,8 @@ actor {
     switch (mediaFiles.get(mediaId)) {
       case (null) { Runtime.trap("Media file not found") };
       case (?media) {
-        if (media.ownerId != caller and not AccessControl.isAdmin(accessControlState, caller)) {
-          Runtime.trap("Unauthorized: Only owner or admin can delete media");
+        if (media.ownerId != caller and not isModeratorOrAdmin(caller)) {
+          Runtime.trap("Unauthorized: Only owner, moderator, or admin can delete media");
         };
         mediaFiles.remove(mediaId);
       };
@@ -877,20 +946,12 @@ actor {
 
   public shared ({ caller }) func followUser(userToFollow : Principal) : async () {
     let _ = requireActiveUser(caller);
-
-    if (caller == userToFollow) {
-      Runtime.trap("Cannot follow yourself");
-    };
-
-    if (not userProfiles.containsKey(userToFollow)) {
-      Runtime.trap("User not found");
-    };
-
+    if (caller == userToFollow) { Runtime.trap("Cannot follow yourself") };
+    if (not userProfiles.containsKey(userToFollow)) { Runtime.trap("User not found") };
     let existingFollows = switch (userFollows.get(caller)) {
       case (null) { List.empty<Principal>() };
       case (?list) { list };
     };
-
     let alreadyFollowing = existingFollows.any(func(p) { p == userToFollow });
     if (not alreadyFollowing) {
       existingFollows.add(userToFollow);
@@ -900,7 +961,6 @@ actor {
 
   public shared ({ caller }) func unfollowUser(userToUnfollow : Principal) : async () {
     let _ = requireActiveUser(caller);
-
     switch (userFollows.get(caller)) {
       case (null) {};
       case (?list) {
@@ -912,16 +972,11 @@ actor {
 
   public shared ({ caller }) func followPost(postId : Text) : async () {
     let _ = requireActiveUser(caller);
-
-    if (not posts.containsKey(postId)) {
-      Runtime.trap("Post not found");
-    };
-
+    if (not posts.containsKey(postId)) { Runtime.trap("Post not found") };
     let existingFollowers = switch (postFollows.get(postId)) {
       case (null) { List.empty<Principal>() };
       case (?list) { list };
     };
-
     let alreadyFollowing = existingFollowers.any(func(p) { p == caller });
     if (not alreadyFollowing) {
       existingFollowers.add(caller);
@@ -931,7 +986,6 @@ actor {
 
   public shared ({ caller }) func unfollowPost(postId : Text) : async () {
     let _ = requireActiveUser(caller);
-
     switch (postFollows.get(postId)) {
       case (null) {};
       case (?list) {
@@ -943,7 +997,6 @@ actor {
 
   public query ({ caller }) func getFollowedUsers() : async [Principal] {
     let _ = requireActiveUser(caller);
-
     switch (userFollows.get(caller)) {
       case (null) { [] };
       case (?list) { list.toArray() };
@@ -952,12 +1005,10 @@ actor {
 
   public query ({ caller }) func getFollowedUsersPosts() : async [Post] {
     let _ = requireActiveUser(caller);
-
     let followed = switch (userFollows.get(caller)) {
       case (null) { return [] };
       case (?list) { list };
     };
-
     posts.values().toArray().filter(func(post) {
       followed.any(func(p) { p == post.authorPrincipal })
     });
@@ -965,19 +1016,15 @@ actor {
 
   public query ({ caller }) func getFollowedPosts() : async [Text] {
     let _ = requireActiveUser(caller);
-
     let result = List.empty<Text>();
     for ((postId, followers) in postFollows.entries()) {
-      if (followers.any(func(p) { p == caller })) {
-        result.add(postId);
-      };
+      if (followers.any(func(p) { p == caller })) { result.add(postId) };
     };
     result.toArray();
   };
 
   public query ({ caller }) func isFollowingUser(userToCheck : Principal) : async Bool {
     let _ = requireActiveUser(caller);
-
     switch (userFollows.get(caller)) {
       case (null) { false };
       case (?list) { list.any(func(p) { p == userToCheck }) };
@@ -986,7 +1033,6 @@ actor {
 
   public query ({ caller }) func isFollowingPost(postId : Text) : async Bool {
     let _ = requireActiveUser(caller);
-
     switch (postFollows.get(postId)) {
       case (null) { false };
       case (?list) { list.any(func(p) { p == caller }) };
@@ -995,7 +1041,6 @@ actor {
 
   public query ({ caller }) func getPostFollowerCount(postId : Text) : async Nat {
     let _ = requireActiveUser(caller);
-
     switch (postFollows.get(postId)) {
       case (null) { 0 };
       case (?list) { list.size() };
@@ -1013,9 +1058,7 @@ actor {
     let _ = requireActiveUser(caller);
     var count = 0;
     for ((_, notif) in notifications.entries()) {
-      if (notif.recipientPrincipal == caller and not notif.read) {
-        count += 1;
-      };
+      if (notif.recipientPrincipal == caller and not notif.read) { count += 1 };
     };
     count;
   };
@@ -1025,9 +1068,7 @@ actor {
     switch (notifications.get(notifId)) {
       case (null) { Runtime.trap("Notification not found") };
       case (?notif) {
-        if (notif.recipientPrincipal != caller) {
-          Runtime.trap("Unauthorized: Not your notification");
-        };
+        if (notif.recipientPrincipal != caller) { Runtime.trap("Unauthorized: Not your notification") };
         notifications.add(notifId, { notif with read = true });
       };
     };
@@ -1047,9 +1088,7 @@ actor {
     switch (notifications.get(notifId)) {
       case (null) { Runtime.trap("Notification not found") };
       case (?notif) {
-        if (notif.recipientPrincipal != caller) {
-          Runtime.trap("Unauthorized: Not your notification");
-        };
+        if (notif.recipientPrincipal != caller) { Runtime.trap("Unauthorized: Not your notification") };
         notifications.remove(notifId);
       };
     };

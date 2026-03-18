@@ -42,6 +42,58 @@ export function useIsAdmin() {
   });
 }
 
+export function useIsModerator() {
+  const { actor, isFetching } = useActor();
+  return useQuery<boolean>({
+    queryKey: ["isModerator"],
+    queryFn: async () => {
+      if (!actor) return false;
+      return fullActor(actor).isCallerModerator();
+    },
+    enabled: !!actor && !isFetching,
+  });
+}
+
+export function useListModerators() {
+  const { actor, isFetching } = useActor();
+  return useQuery<Array<Principal>>({
+    queryKey: ["moderators"],
+    queryFn: async () => {
+      if (!actor) return [];
+      return fullActor(actor).listModerators();
+    },
+    enabled: !!actor && !isFetching,
+  });
+}
+
+export function useAssignModerator() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (principal: Principal) => {
+      if (!actor) throw new Error("Inte inloggad");
+      return fullActor(actor).assignModerator(principal);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["moderators"] });
+    },
+  });
+}
+
+export function useRevokeModerator() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (principal: Principal) => {
+      if (!actor) throw new Error("Inte inloggad");
+      return fullActor(actor).revokeModerator(principal);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["moderators"] });
+    },
+  });
+}
+
 export function useListUsers() {
   const { actor, isFetching } = useActor();
   return useQuery<UserProfile[]>({
@@ -737,5 +789,60 @@ export function useDeleteNotification() {
       queryClient.invalidateQueries({ queryKey: ["notifications"] });
       queryClient.invalidateQueries({ queryKey: ["unreadCount"] });
     },
+  });
+}
+
+export function useGetCategorySchedule(categoryId: string | null) {
+  const { actor, isFetching } = useActor();
+  return useQuery({
+    queryKey: ["categorySchedule", categoryId],
+    queryFn: async () => {
+      if (!actor || !categoryId) return null;
+      return fullActor(actor).getCategorySchedule(categoryId);
+    },
+    enabled: !!actor && !isFetching && !!categoryId,
+  });
+}
+
+export function useSetCategorySchedule() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      categoryId,
+      enabled,
+      weekday,
+      hour,
+    }: {
+      categoryId: string;
+      enabled: boolean;
+      weekday: number;
+      hour: number;
+    }) => {
+      if (!actor) throw new Error("Inte inloggad");
+      return fullActor(actor).setCategorySchedule(
+        categoryId,
+        enabled,
+        BigInt(weekday),
+        BigInt(hour),
+      );
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: ["categorySchedule", variables.categoryId],
+      });
+    },
+  });
+}
+
+export function useListCleanupLogs(categoryId: string | null) {
+  const { actor, isFetching } = useActor();
+  return useQuery({
+    queryKey: ["cleanupLogs", categoryId],
+    queryFn: async () => {
+      if (!actor) return [];
+      return fullActor(actor).listCleanupLogs(categoryId);
+    },
+    enabled: !!actor && !isFetching,
   });
 }

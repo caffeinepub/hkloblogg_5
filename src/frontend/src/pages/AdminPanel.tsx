@@ -12,8 +12,17 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
 import {
   Table,
   TableBody,
@@ -27,6 +36,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
   BookOpen,
+  Clock,
   Eye,
   EyeOff,
   FileText,
@@ -60,6 +70,7 @@ import AuthorName from "../components/AuthorName";
 import { useActor } from "../hooks/useActor";
 import {
   useAddUserToCategoryAllowedList,
+  useAssignModerator,
   useBlockUser,
   useCreateCategory,
   useDeleteCategory,
@@ -67,12 +78,18 @@ import {
   useDeletePost,
   useDeleteUser,
   useGetCategoryAllowedUsers,
+  useGetCategorySchedule,
   useGetHiddenCategoryIds,
+  useIsModerator as useIsCallerModerator,
   useListCategories,
+  useListCleanupLogs,
+  useListModerators,
   useListPosts,
   useListUsersWithPrincipal,
   usePinPost,
   useRemoveUserFromCategoryAllowedList,
+  useRevokeModerator,
+  useSetCategorySchedule,
   useSetRole,
   useToggleCategoryHidden,
   useUnblockUser,
@@ -190,10 +207,30 @@ function CategoryRow({
   const deleteCategory = useDeleteCategory();
   const toggleHidden = useToggleCategoryHidden();
   const [showWhitelist, setShowWhitelist] = useState(false);
+  const [showSchedule, setShowSchedule] = useState(false);
+  const { data: scheduleData } = useGetCategorySchedule(
+    showSchedule ? category.id : null,
+  );
+  const setScheduleMutation = useSetCategorySchedule();
+  const [schedEnabled, setSchedEnabled] = useState(false);
+  const [schedWeekday, setSchedWeekday] = useState("1");
+  const [schedHour, setSchedHour] = useState("23");
+  const [schedInit, setSchedInit] = useState(false);
   const [userSearchQuery, setUserSearchQuery] = useState("");
   const { data: allowedPrincipals } = useGetCategoryAllowedUsers(
     isHidden ? category.id : null,
   );
+  // Initialize schedule form from fetched data
+  if (scheduleData !== undefined && scheduleData !== null && !schedInit) {
+    setSchedEnabled(scheduleData.enabled);
+    setSchedWeekday(scheduleData.weekday.toString());
+    setSchedHour(scheduleData.hour.toString());
+    setSchedInit(true);
+  }
+  if (!showSchedule && schedInit) {
+    // reset when closed
+  }
+
   const addToWhitelist = useAddUserToCategoryAllowedList();
   const removeFromWhitelist = useRemoveUserFromCategoryAllowedList();
 
@@ -265,6 +302,20 @@ function CategoryRow({
     }
   };
 
+  const handleSaveSchedule = async () => {
+    try {
+      await setScheduleMutation.mutateAsync({
+        categoryId: category.id,
+        enabled: schedEnabled,
+        weekday: Number.parseInt(schedWeekday),
+        hour: Number.parseInt(schedHour),
+      });
+      toast.success(`Schema för "${category.name}" sparat.`);
+    } catch {
+      toast.error("Kunde inte spara schema.");
+    }
+  };
+
   return (
     <>
       <TableRow
@@ -318,6 +369,19 @@ function CategoryRow({
                 <UserPlus className="h-4 w-4" />
               </Button>
             )}
+            <Button
+              data-ocid={`admin.categories.schedule.${index}`}
+              variant={showSchedule ? "secondary" : "ghost"}
+              size="sm"
+              onClick={() => {
+                setShowSchedule((v) => !v);
+                setSchedInit(false);
+              }}
+              title="Automatisk rensning"
+              className="text-muted-foreground hover:text-foreground"
+            >
+              <Clock className="h-4 w-4" />
+            </Button>
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button
@@ -359,6 +423,100 @@ function CategoryRow({
           </div>
         </TableCell>
       </TableRow>
+      {showSchedule && (
+        <TableRow data-ocid={`admin.categories.schedule_panel.${index}`}>
+          <TableCell colSpan={3} className="py-4 px-6 bg-muted/30">
+            <div className="space-y-4 max-w-sm">
+              <p className="text-xs font-medium text-foreground">
+                Automatisk rensning för &ldquo;{category.name}&rdquo;
+              </p>
+              <div className="flex items-center gap-3">
+                <Switch
+                  id={`sched-enabled-${category.id}`}
+                  checked={schedEnabled}
+                  onCheckedChange={setSchedEnabled}
+                />
+                <Label
+                  htmlFor={`sched-enabled-${category.id}`}
+                  className="text-sm"
+                >
+                  Aktivera automatisk rensning
+                </Label>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">
+                    Veckodag
+                  </Label>
+                  <Select value={schedWeekday} onValueChange={setSchedWeekday}>
+                    <SelectTrigger
+                      className="h-8 text-sm"
+                      data-ocid={`admin.categories.weekday.select.${index}`}
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="0">Måndag</SelectItem>
+                      <SelectItem value="1">Tisdag</SelectItem>
+                      <SelectItem value="2">Onsdag</SelectItem>
+                      <SelectItem value="3">Torsdag</SelectItem>
+                      <SelectItem value="4">Fredag</SelectItem>
+                      <SelectItem value="5">Lördag</SelectItem>
+                      <SelectItem value="6">Söndag</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">
+                    Klockslag (UTC)
+                  </Label>
+                  <Select value={schedHour} onValueChange={setSchedHour}>
+                    <SelectTrigger
+                      className="h-8 text-sm"
+                      data-ocid={`admin.categories.hour.select.${index}`}
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Array.from({ length: 24 }, (_, i) => (
+                        <SelectItem key={i.toString()} value={i.toString()}>
+                          {i.toString().padStart(2, "0")}:00
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              {scheduleData?.lastRunAt != null && (
+                <p className="text-xs text-muted-foreground">
+                  Senast körde:{" "}
+                  {new Date(
+                    Number(scheduleData.lastRunAt) / 1_000_000,
+                  ).toLocaleString("sv-SE")}
+                </p>
+              )}
+              <p className="text-xs text-destructive/80">
+                OBS: Alla inlägg, kommentarer och mediafiler i kategorin raderas
+                permanent.
+              </p>
+              <Button
+                data-ocid={`admin.categories.schedule.save_button.${index}`}
+                size="sm"
+                className="h-8 gap-1.5"
+                onClick={handleSaveSchedule}
+                disabled={setScheduleMutation.isPending}
+              >
+                {setScheduleMutation.isPending ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Clock className="h-3.5 w-3.5" />
+                )}
+                Spara schema
+              </Button>
+            </div>
+          </TableCell>
+        </TableRow>
+      )}
       {showWhitelist && isHidden && (
         <TableRow data-ocid={`admin.categories.whitelist_panel.${index}`}>
           <TableCell colSpan={3} className="py-3 px-6 bg-muted/30">
@@ -434,15 +592,22 @@ function CategoryRow({
 function UserRow({
   user,
   index,
+  moderatorPrincipals,
+  isSuperAdmin,
 }: {
   user: UserWithPrincipal;
   index: number;
+  moderatorPrincipals: string[];
+  isSuperAdmin: boolean;
 }) {
   const isAdmin = user.profile.role === UserRole.admin;
+  const isModerator = moderatorPrincipals.includes(user.principal.toString());
   const blockUser = useBlockUser();
   const unblockUser = useUnblockUser();
   const setRole = useSetRole();
   const deleteUser = useDeleteUser();
+  const assignModerator = useAssignModerator();
+  const revokeModerator = useRevokeModerator();
 
   const handleBlock = async () => {
     try {
@@ -481,11 +646,27 @@ function UserRow({
     }
   };
 
+  const handleModeratorToggle = async () => {
+    try {
+      if (isModerator) {
+        await revokeModerator.mutateAsync(user.principal);
+        toast.success(`${user.profile.alias} är inte längre moderator.`);
+      } else {
+        await assignModerator.mutateAsync(user.principal);
+        toast.success(`${user.profile.alias} är nu moderator.`);
+      }
+    } catch {
+      toast.error("Kunde inte ändra moderatorstatus.");
+    }
+  };
+
   const isActing =
     blockUser.isPending ||
     unblockUser.isPending ||
     setRole.isPending ||
-    deleteUser.isPending;
+    deleteUser.isPending ||
+    assignModerator.isPending ||
+    revokeModerator.isPending;
 
   return (
     <TableRow
@@ -494,9 +675,19 @@ function UserRow({
     >
       <TableCell className="font-medium">{user.profile.alias}</TableCell>
       <TableCell>
-        <Badge variant={isAdmin ? "default" : "secondary"} className="text-xs">
-          {isAdmin ? "Admin" : "Användare"}
-        </Badge>
+        <div className="flex items-center gap-1 flex-wrap">
+          <Badge
+            variant={isAdmin ? "default" : "secondary"}
+            className="text-xs"
+          >
+            {isAdmin ? "Admin" : "Användare"}
+          </Badge>
+          {isModerator && (
+            <Badge className="text-xs bg-amber-100 text-amber-800 border border-amber-200 hover:bg-amber-100">
+              Moderator
+            </Badge>
+          )}
+        </div>
       </TableCell>
       <TableCell>
         {user.profile.blocked ? (
@@ -521,6 +712,23 @@ function UserRow({
           >
             {user.profile.blocked ? "Avblockera" : "Blockera"}
           </Button>
+          {isSuperAdmin && !isAdmin && (
+            <Button
+              data-ocid={`admin.users.toggle.${index}`}
+              variant="ghost"
+              size="sm"
+              onClick={handleModeratorToggle}
+              disabled={isActing}
+              title={isModerator ? "Ta bort moderator" : "Gör moderator"}
+              className={
+                isModerator
+                  ? "text-amber-600 hover:text-amber-700 text-xs"
+                  : "text-muted-foreground hover:text-foreground text-xs"
+              }
+            >
+              <Shield className="h-3.5 w-3.5" />
+            </Button>
+          )}
           <Button
             data-ocid={`admin.users.edit_button.${index}`}
             variant="ghost"
@@ -689,10 +897,13 @@ function useAllComments() {
 
 export default function AdminPanel({ onBack }: AdminPanelProps) {
   const { data: categories, isLoading: loadingCats } = useListCategories();
+  const { data: cleanupLogs } = useListCleanupLogs(null);
   const { data: hiddenCategoryIds } = useGetHiddenCategoryIds();
   const { data: users, isLoading: loadingUsers } = useListUsersWithPrincipal();
   const { data: posts, isLoading: loadingPosts } = useListPosts(null);
   const { data: allComments, isLoading: loadingComments } = useAllComments();
+  const { data: moderatorList } = useListModerators();
+  const { data: isCallerAdmin } = useIsCallerModerator();
   const createCategory = useCreateCategory();
   const { actor } = useActor();
   const [newCatName, setNewCatName] = useState("");
@@ -705,6 +916,13 @@ export default function AdminPanel({ onBack }: AdminPanelProps) {
   const [mediaSearch, setMediaSearch] = useState("");
 
   const hiddenIdsSet = new Set(hiddenCategoryIds ?? []);
+  const moderatorPrincipals = (moderatorList ?? []).map((p) => p.toString());
+  // isSuperAdmin: the admin panel is only accessible to admins; we check if caller is NOT a moderator but IS admin
+  // We'll determine superAdmin by checking myProfile role via actor directly -- use isCallerAdmin state
+  // For simplicity: anyone who can access AdminPanel is admin; isSuperAdmin means they can also manage moderators
+  // The backend assignModerator is restricted to superadmin, so we show the button for all admins
+  // but let backend enforce the actual restriction. We show it when caller is admin (isCallerAdmin).
+  const isSuperAdmin = isCallerAdmin !== false;
 
   const { data: allMedia, isLoading: loadingMedia } = useQuery<MediaFile[]>({
     queryKey: ["allMedia"],
@@ -958,6 +1176,70 @@ export default function AdminPanel({ onBack }: AdminPanelProps) {
                   </Table>
                 )}
               </div>
+
+              {/* ---- RENSNINGSLOGG ---- */}
+              <div
+                className="bg-card border border-border rounded-xl overflow-hidden shadow-card"
+                data-ocid="admin.cleanup_log.panel"
+              >
+                <div className="px-6 py-4 border-b border-border">
+                  <h2 className="font-semibold text-foreground flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-muted-foreground" />
+                    Rensningslogg
+                  </h2>
+                </div>
+                {!cleanupLogs || cleanupLogs.length === 0 ? (
+                  <div
+                    data-ocid="admin.cleanup_log.empty_state"
+                    className="py-8 text-center text-muted-foreground text-sm"
+                  >
+                    Ingen automatisk rensning har körts ännu.
+                  </div>
+                ) : (
+                  <Table data-ocid="admin.cleanup_log.table">
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Kategori</TableHead>
+                        <TableHead>Datum &amp; tid</TableHead>
+                        <TableHead className="text-right">Inlägg</TableHead>
+                        <TableHead className="text-right">
+                          Kommentarer
+                        </TableHead>
+                        <TableHead className="text-right">Mediafiler</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {[...cleanupLogs]
+                        .sort((a, b) => Number(b.ranAt - a.ranAt))
+                        .slice(0, 20)
+                        .map((log, i) => (
+                          <TableRow
+                            key={log.id.toString()}
+                            data-ocid={`admin.cleanup_log.item.${i + 1}`}
+                          >
+                            <TableCell className="font-medium text-sm">
+                              {log.categoryName}
+                            </TableCell>
+                            <TableCell className="text-sm text-muted-foreground">
+                              {new Date(
+                                Number(log.ranAt) / 1_000_000,
+                              ).toLocaleString("sv-SE")}
+                            </TableCell>
+                            <TableCell className="text-right text-sm">
+                              {log.postsDeleted.toString()}
+                            </TableCell>
+                            <TableCell className="text-right text-sm">
+                              {log.commentsDeleted.toString()}
+                            </TableCell>
+                            <TableCell className="text-right text-sm">
+                              {log.mediaDeleted.toString()}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </div>
             </TabsContent>
 
             {/* ---- ANVÄNDARE ---- */}
@@ -1015,6 +1297,8 @@ export default function AdminPanel({ onBack }: AdminPanelProps) {
                           key={user.profile.alias}
                           user={user}
                           index={i + 1}
+                          moderatorPrincipals={moderatorPrincipals}
+                          isSuperAdmin={isSuperAdmin}
                         />
                       ))}
                     </TableBody>

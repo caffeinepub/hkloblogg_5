@@ -19,6 +19,7 @@ import { motion } from "motion/react";
 import { useState } from "react";
 import type { Post } from "../backend.d";
 import AuthorName from "../components/AuthorName";
+import MobileMenu from "../components/MobileMenu";
 import NotificationBell from "../components/NotificationBell";
 import ScrollToTop from "../components/ScrollToTop";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
@@ -179,7 +180,7 @@ export default function FeedPage({
             </span>
           </div>
           <div className="flex items-center gap-2">
-            {/* Search */}
+            {/* Search – desktop only */}
             <form
               onSubmit={handleSearch}
               className="hidden sm:flex items-center"
@@ -196,13 +197,13 @@ export default function FeedPage({
               </div>
             </form>
 
-            {/* Mitt flöde */}
+            {/* Mitt flöde – desktop */}
             {identity && hasProfile && (
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={onMyFeed}
-                className="gap-1.5 text-muted-foreground hover:text-foreground"
+                className="hidden sm:flex gap-1.5 text-muted-foreground hover:text-foreground"
                 title="Mitt flöde"
               >
                 <Rss className="w-3.5 h-3.5" />
@@ -213,12 +214,13 @@ export default function FeedPage({
             {/* Notification bell */}
             {identity && hasProfile && <NotificationBell onPost={onPost} />}
 
+            {/* Profile button – desktop */}
             {profile && (
               <button
                 type="button"
                 data-ocid="feed.profile.button"
                 onClick={onProfile}
-                className="hidden sm:flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors px-2 py-1 rounded-md hover:bg-muted"
+                className="hidden sm:flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors px-2 py-1 rounded-md hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <User className="w-3.5 h-3.5" />
                 <span>{profile.alias}</span>
@@ -229,33 +231,46 @@ export default function FeedPage({
                 type="button"
                 data-ocid="feed.profile.button"
                 onClick={onProfile}
-                className="hidden sm:flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors px-2 py-1 rounded-md hover:bg-muted"
+                className="hidden sm:flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors px-2 py-1 rounded-md hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <User className="w-3.5 h-3.5" />
                 <span>Profil</span>
               </button>
             )}
+
+            {/* Admin panel – desktop */}
             {isAdmin && (
               <Button
                 data-ocid="feed.admin_panel.button"
                 variant="outline"
                 size="sm"
                 onClick={onAdminPanel}
-                className="gap-1.5 text-primary border-primary/30 hover:bg-primary/5"
+                className="hidden sm:flex gap-1.5 text-primary border-primary/30 hover:bg-primary/5"
               >
                 <Shield className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Adminpanel</span>
+                <span>Adminpanel</span>
               </Button>
             )}
+
+            {/* Logout – desktop */}
             <Button
               data-ocid="feed.logout.button"
               variant="ghost"
               size="sm"
               onClick={clear}
-              className="text-muted-foreground"
+              className="hidden sm:flex text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
             >
               <LogOut className="w-4 h-4" />
             </Button>
+
+            {/* Mobile hamburger menu */}
+            <MobileMenu
+              hasProfile={hasProfile}
+              onMyFeed={onMyFeed}
+              onProfile={onProfile}
+              onAdminPanel={onAdminPanel}
+              onSearch={onSearch}
+            />
           </div>
         </div>
       </header>
@@ -297,7 +312,7 @@ export default function FeedPage({
             type="button"
             data-ocid="feed.all.tab"
             onClick={() => setActiveCatId(null)}
-            className={`shrink-0 px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
+            className={`shrink-0 px-4 py-2 min-h-[36px] rounded-full text-sm font-medium transition-colors touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
               activeCatId === null
                 ? "bg-primary text-primary-foreground"
                 : "text-muted-foreground hover:text-foreground hover:bg-muted"
@@ -311,7 +326,7 @@ export default function FeedPage({
               key={cat.id}
               data-ocid="feed.category.tab"
               onClick={() => setActiveCatId(cat.id)}
-              className={`shrink-0 px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
+              className={`shrink-0 px-4 py-2 min-h-[36px] rounded-full text-sm font-medium transition-colors touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                 activeCatId === cat.id
                   ? "bg-primary text-primary-foreground"
                   : "text-muted-foreground hover:text-foreground hover:bg-muted"
@@ -369,7 +384,7 @@ export default function FeedPage({
         data-ocid="feed.create_post.button"
         onClick={hasProfile ? onCreatePost : onProfile}
         disabled={false}
-        className={`fixed bottom-8 right-8 z-30 flex items-center gap-2 px-5 py-3 rounded-full shadow-lg active:scale-95 transition-all text-sm font-medium ${
+        className={`fixed bottom-8 right-8 z-30 flex items-center gap-2 px-5 py-3 rounded-full shadow-lg active:scale-95 transition-all text-sm font-medium touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
           hasProfile
             ? "bg-primary text-primary-foreground hover:opacity-90"
             : "bg-muted text-muted-foreground cursor-not-allowed opacity-60"
