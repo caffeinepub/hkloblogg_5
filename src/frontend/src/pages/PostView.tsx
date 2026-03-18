@@ -35,6 +35,7 @@ import { toast } from "sonner";
 import AuthorName from "../components/AuthorName";
 import CommentsSection from "../components/CommentsSection";
 import MediaGallery from "../components/MediaGallery";
+import ScrollToTop from "../components/ScrollToTop";
 import VideoPlayer from "../components/VideoPlayer";
 import { useActor } from "../hooks/useActor";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
@@ -52,6 +53,7 @@ import {
   useUnfollowPost,
 } from "../hooks/useQueries";
 import { useStorageClient } from "../hooks/useStorageClient";
+import { readTime } from "../lib/readTime";
 
 interface PostViewProps {
   postId: string;
@@ -162,7 +164,7 @@ export default function PostView({
     <div className="min-h-screen bg-background flex flex-col">
       <div className="h-1 bg-primary w-full" />
 
-      <header className="border-b border-border bg-card sticky top-0 z-20">
+      <header className="border-b border-border bg-card/95 backdrop-blur-sm sticky top-0 z-20">
         <div className="max-w-3xl mx-auto px-6 py-4 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <Button
@@ -245,6 +247,25 @@ export default function PostView({
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4 }}
           >
+            {/* Breadcrumbs */}
+            <nav className="flex items-center gap-1.5 text-xs text-muted-foreground mb-4 flex-wrap">
+              <button
+                type="button"
+                onClick={onBack}
+                className="hover:text-primary transition-colors hover:underline"
+              >
+                Hem
+              </button>
+              <span>203a</span>
+              <span className="truncate max-w-[140px]">{categoryName}</span>
+              <span>203a</span>
+              <span className="truncate max-w-[200px] text-foreground/70">
+                {post.title.length > 40
+                  ? `${post.title.slice(0, 40)}2026`
+                  : post.title}
+              </span>
+            </nav>
+
             {/* Meta row */}
             <div className="flex items-center gap-2 flex-wrap mb-4">
               {post.pinned && (
@@ -296,6 +317,8 @@ export default function PostView({
                   </span>
                 </>
               )}
+              <span>·</span>
+              <span>{readTime(post.body)}</span>
             </div>
 
             <Separator className="mb-8" />
@@ -456,6 +479,8 @@ export default function PostView({
           </motion.article>
         )}
       </main>
+
+      <ScrollToTop />
 
       <footer className="py-5 text-center text-xs text-muted-foreground border-t border-border">
         © {new Date().getFullYear()}.{" "}

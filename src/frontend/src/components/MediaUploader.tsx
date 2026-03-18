@@ -7,8 +7,7 @@ import { useRef, useState } from "react";
 
 const MAX_IMAGE_SIZE = 15 * 1024 * 1024; // 15 MB
 const TARGET_COMPRESS_SIZE = 1 * 1024 * 1024; // 1 MB
-const MAX_VIDEO_SIZE = 30 * 1024 * 1024; // 30 MB
-const MAX_VIDEO_DURATION = 3 * 60; // 3 minutes in seconds
+const MAX_VIDEO_SIZE = 100 * 1024 * 1024; // 100 MB
 
 export interface StagedFile {
   file: File;
@@ -27,29 +26,6 @@ interface MediaUploaderProps {
 function formatSize(bytes: number): string {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-async function validateVideo(file: File): Promise<string | null> {
-  return new Promise((resolve) => {
-    const video = document.createElement("video");
-    const url = URL.createObjectURL(file);
-    video.preload = "metadata";
-    video.src = url;
-    video.onloadedmetadata = () => {
-      URL.revokeObjectURL(url);
-      if (video.duration > MAX_VIDEO_DURATION) {
-        resolve(
-          `Videon är längre än 3 minuter (${Math.round(video.duration / 60)} min).`,
-        );
-      } else {
-        resolve(null);
-      }
-    };
-    video.onerror = () => {
-      URL.revokeObjectURL(url);
-      resolve("Kunde inte läsa videofilen. Kontrollera formatet.");
-    };
-  });
 }
 
 export async function compressImage(file: File): Promise<File> {
@@ -152,17 +128,9 @@ export default function MediaUploader({
         newStaged.push({
           file,
           compress: false,
-          error: `Videon är för stor (${formatSize(file.size)}). Max 30 MB.`,
+          error: `Videon är för stor (${formatSize(file.size)}). Max 100 MB.`,
         });
         continue;
-      }
-
-      if (isVideo) {
-        const err = await validateVideo(file);
-        if (err) {
-          newStaged.push({ file, compress: false, error: err });
-          continue;
-        }
       }
 
       newStaged.push({ file, compress: false });
@@ -206,7 +174,7 @@ export default function MediaUploader({
           Lägg till media
         </Button>
         <span className="text-xs text-muted-foreground">
-          Bilder: max 15 MB. Videor: MP4, max 30 MB, max 3 minuter.
+          Bilder: max 15 MB. Videor: MP4, max 100 MB.
         </span>
       </div>
 

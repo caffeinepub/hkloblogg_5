@@ -7,6 +7,7 @@ import {
   Heart,
   Info,
   LogOut,
+  MessageCircle,
   PenLine,
   Pin,
   Rss,
@@ -19,14 +20,17 @@ import { useState } from "react";
 import type { Post } from "../backend.d";
 import AuthorName from "../components/AuthorName";
 import NotificationBell from "../components/NotificationBell";
+import ScrollToTop from "../components/ScrollToTop";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import {
   useIsAdmin,
   useListCategories,
+  useListComments,
   useListPosts,
   useMyLikedPosts,
   useMyProfile,
 } from "../hooks/useQueries";
+import { readTime } from "../lib/readTime";
 
 interface FeedPageProps {
   hasProfile?: boolean;
@@ -36,6 +40,20 @@ interface FeedPageProps {
   onSearch: (query: string) => void;
   onProfile: () => void;
   onMyFeed: () => void;
+}
+
+function CommentCount({ postId }: { postId: string }) {
+  const { data: comments, isLoading } = useListComments(postId);
+  return (
+    <span className="flex items-center gap-1 text-xs text-muted-foreground">
+      <MessageCircle className="w-3.5 h-3.5" />
+      {isLoading ? (
+        <span className="opacity-40">-</span>
+      ) : (
+        (comments ?? []).length
+      )}
+    </span>
+  );
 }
 
 function PostCard({
@@ -60,7 +78,7 @@ function PostCard({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, delay: index * 0.05 }}
       onClick={onClick}
-      className="group bg-card border border-border rounded-xl p-5 shadow-card hover:shadow-md hover:border-primary/30 cursor-pointer transition-all duration-200"
+      className="group bg-card border border-border rounded-xl p-5 shadow-sm hover:shadow-md hover:border-primary/30 hover:-translate-y-0.5 cursor-pointer transition-all duration-200"
     >
       <div className="flex items-start justify-between gap-3 mb-2">
         <div className="flex items-center gap-2 flex-wrap">
@@ -93,8 +111,10 @@ function PostCard({
         {post.title}
       </h2>
 
-      <div className="flex items-center gap-2 text-xs text-muted-foreground mt-3">
+      <div className="flex items-center gap-2 text-xs text-muted-foreground mt-3 flex-wrap">
         <AuthorName principal={post.authorPrincipal} />
+        <span>·</span>
+        <CommentCount postId={post.id} />
         <span>·</span>
         <time dateTime={date.toISOString()}>
           {date.toLocaleDateString("sv-SE", {
@@ -103,6 +123,8 @@ function PostCard({
             day: "numeric",
           })}
         </time>
+        <span>·</span>
+        <span>{readTime(post.body)}</span>
       </div>
     </motion.article>
   );
@@ -148,11 +170,11 @@ export default function FeedPage({
     <div className="min-h-screen bg-background flex flex-col">
       <div className="h-1 bg-primary w-full" />
 
-      <header className="border-b border-border bg-card sticky top-0 z-20">
+      <header className="border-b border-border bg-card/95 backdrop-blur-sm sticky top-0 z-20">
         <div className="max-w-3xl mx-auto px-6 py-4 flex items-center justify-between gap-4">
           <div className="flex items-center gap-2">
             <BookOpen className="w-5 h-5 text-primary" strokeWidth={1.5} />
-            <span className="font-display text-xl text-foreground">
+            <span className="font-display text-xl text-foreground border-b-2 border-primary pb-0.5">
               HKLOblogg
             </span>
           </div>
@@ -269,7 +291,7 @@ export default function FeedPage({
       )}
 
       {/* Category filter */}
-      <div className="border-b border-border bg-card/60 backdrop-blur-sm sticky top-[57px] z-10">
+      <div className="border-b border-border bg-card/60 backdrop-blur-sm sticky top-[65px] z-10">
         <div className="max-w-3xl mx-auto px-6 py-3 flex items-center gap-2 overflow-x-auto scrollbar-none">
           <button
             type="button"
@@ -362,6 +384,8 @@ export default function FeedPage({
         <PenLine className="w-4 h-4" />
         Nytt inlägg
       </button>
+
+      <ScrollToTop />
 
       <footer className="py-5 text-center text-xs text-muted-foreground border-t border-border">
         © {new Date().getFullYear()}.{" "}

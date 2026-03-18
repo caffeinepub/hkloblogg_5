@@ -208,7 +208,15 @@ function CommentItem({
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.25, delay: index * 0.03 }}
-      className={`${depth > 0 ? "ml-6 pl-4 border-l-2 border-border" : ""}`}
+      className={`${
+        depth === 1
+          ? "ml-6 pl-4 border-l-2 border-primary/40 bg-primary/[0.02]"
+          : depth === 2
+            ? "ml-6 pl-4 border-l-2 border-amber-400/40 bg-amber-50/30"
+            : depth >= 3
+              ? "ml-6 pl-4 border-l-2 border-muted-foreground/30"
+              : ""
+      }`}
     >
       <div className="bg-card border border-border rounded-xl p-4 mb-2">
         {/* Author + time */}
