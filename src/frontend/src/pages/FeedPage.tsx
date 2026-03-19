@@ -10,7 +10,6 @@ import {
   MessageCircle,
   PenLine,
   Pin,
-  Rss,
   Search,
   Shield,
   User,
@@ -19,9 +18,11 @@ import { motion } from "motion/react";
 import { useState } from "react";
 import type { Post } from "../backend.d";
 import AuthorName from "../components/AuthorName";
+import CategoryBottomSheet from "../components/CategoryBottomSheet";
 import MobileMenu from "../components/MobileMenu";
 import NotificationBell from "../components/NotificationBell";
 import ScrollToTop from "../components/ScrollToTop";
+import SubNavBar from "../components/SubNavBar";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import {
   useIsAdmin,
@@ -148,6 +149,7 @@ export default function FeedPage({
   const { data: posts, isLoading } = useListPosts(activeCatId);
   const { data: likedPosts } = useMyLikedPosts();
   const [searchInput, setSearchInput] = useState("");
+  const [sheetOpen, setSheetOpen] = useState(false);
 
   const likedSet = new Set(likedPosts ?? []);
 
@@ -158,6 +160,10 @@ export default function FeedPage({
   });
 
   const catMap = new Map((categories ?? []).map((c) => [c.id, c.name]));
+
+  const activeCategoryName = activeCatId
+    ? (catMap.get(activeCatId) ?? "Alla")
+    : "Alla";
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -196,20 +202,6 @@ export default function FeedPage({
                 />
               </div>
             </form>
-
-            {/* Mitt flöde – desktop */}
-            {identity && hasProfile && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={onMyFeed}
-                className="hidden sm:flex gap-1.5 text-muted-foreground hover:text-foreground"
-                title="Mitt flöde"
-              >
-                <Rss className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Mitt flöde</span>
-              </Button>
-            )}
 
             {/* Notification bell */}
             {identity && hasProfile && <NotificationBell onPost={onPost} />}
@@ -305,38 +297,16 @@ export default function FeedPage({
         </motion.div>
       )}
 
-      {/* Category filter */}
-      <div className="border-b border-border bg-card/60 backdrop-blur-sm sticky top-[65px] z-10">
-        <div className="max-w-3xl mx-auto px-6 py-3 flex items-center gap-2 overflow-x-auto scrollbar-none">
-          <button
-            type="button"
-            data-ocid="feed.all.tab"
-            onClick={() => setActiveCatId(null)}
-            className={`shrink-0 px-4 py-2 min-h-[36px] rounded-full text-sm font-medium transition-colors touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-              activeCatId === null
-                ? "bg-primary text-primary-foreground"
-                : "text-muted-foreground hover:text-foreground hover:bg-muted"
-            }`}
-          >
-            Alla
-          </button>
-          {(categories ?? []).map((cat) => (
-            <button
-              type="button"
-              key={cat.id}
-              data-ocid="feed.category.tab"
-              onClick={() => setActiveCatId(cat.id)}
-              className={`shrink-0 px-4 py-2 min-h-[36px] rounded-full text-sm font-medium transition-colors touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                activeCatId === cat.id
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:text-foreground hover:bg-muted"
-              }`}
-            >
-              {cat.name}
-            </button>
-          ))}
-        </div>
-      </div>
+      {/* Sub navigation bar with category hamburger */}
+      <SubNavBar
+        hasProfile={hasProfile}
+        activeCategoryName={activeCategoryName}
+        onHome={() => setActiveCatId(null)}
+        onMyFeed={onMyFeed}
+        onCreatePost={hasProfile ? onCreatePost : onProfile}
+        onOpenCategories={() => setSheetOpen(true)}
+        showMyFeed={!!identity && hasProfile}
+      />
 
       <main className="flex-1 max-w-3xl mx-auto w-full px-6 py-8">
         {isLoading ? (
@@ -400,10 +370,19 @@ export default function FeedPage({
         Nytt inlägg
       </button>
 
+      {/* Category bottom sheet */}
+      <CategoryBottomSheet
+        open={sheetOpen}
+        onClose={() => setSheetOpen(false)}
+        categories={categories ?? []}
+        activeCatId={activeCatId}
+        onSelect={setActiveCatId}
+      />
+
       <ScrollToTop />
 
       <footer className="py-5 text-center text-xs text-muted-foreground border-t border-border">
-        © {new Date().getFullYear()}.{" "}
+        © {new Date().getFullYear()}. 
         <a
           href={`https://caffeine.ai?utm_source=caffeine-footer&utm_medium=referral&utm_content=${encodeURIComponent(window.location.hostname)}`}
           target="_blank"
