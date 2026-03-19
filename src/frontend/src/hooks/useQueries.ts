@@ -846,3 +846,25 @@ export function useListCleanupLogs(categoryId: string | null) {
     enabled: !!actor && !isFetching,
   });
 }
+
+export function useRecordPostHash() {
+  const { actor } = useActor();
+  return useMutation({
+    mutationFn: async ({ postId, hash }: { postId: string; hash: string }) => {
+      if (!actor) throw new Error("Inte inloggad");
+      return fullActor(actor).recordPostHash(postId, hash);
+    },
+  });
+}
+
+export function useGetPostHashHistory(postId: string | null) {
+  const { actor, isFetching } = useActor();
+  return useQuery<Array<[string, bigint]>>({
+    queryKey: ["postHashHistory", postId],
+    queryFn: async () => {
+      if (!actor || !postId) return [];
+      return fullActor(actor).getPostHashHistory(postId);
+    },
+    enabled: !!actor && !isFetching && !!postId,
+  });
+}

@@ -11,6 +11,12 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -20,6 +26,10 @@ import {
   Bell,
   BellOff,
   BookOpen,
+  CheckCircle2,
+  Clock,
+  Copy,
+  ExternalLink,
   Heart,
   LogOut,
   Pencil,
@@ -27,6 +37,7 @@ import {
   PinOff,
   Search,
   Shield,
+  ShieldCheck,
   Trash2,
 } from "lucide-react";
 import { motion } from "motion/react";
@@ -38,6 +49,7 @@ import MediaGallery from "../components/MediaGallery";
 import MobileMenu from "../components/MobileMenu";
 import ScrollToTop from "../components/ScrollToTop";
 import VideoPlayer from "../components/VideoPlayer";
+import { loadConfig } from "../config";
 import { useActor } from "../hooks/useActor";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import {
@@ -45,6 +57,7 @@ import {
   useFollowPost,
   useGetPost,
   useGetPostFollowerCount,
+  useGetPostHashHistory,
   useIsAdmin,
   useIsFollowingPost,
   useIsModerator,
@@ -88,6 +101,12 @@ export default function PostView({
   const { actor } = useActor();
   const storageClient = useStorageClient();
   const [searchInput, setSearchInput] = useState("");
+  const [showVerify, setShowVerify] = useState(false);
+  const [verifyPostId, setVerifyPostId] = useState<string | null>(null);
+  const [currentHash, setCurrentHash] = useState<string>("");
+  const [canisterId, setCanisterId] = useState<string>("");
+  const [hashCopied, setHashCopied] = useState(false);
+  const { data: hashHistory } = useGetPostHashHistory(verifyPostId);
   const [likeAnimating, setLikeAnimating] = useState(false);
 
   const { data: postMedia } = useQuery({
@@ -158,6 +177,37 @@ export default function PostView({
       }
     } catch {
       toast.error("Kunde inte ändra följning.");
+    }
+  };
+
+  const handleVerify = async () => {
+    if (!post) return;
+    const titleVal = post.title;
+    const bodyVal = post.body;
+    const postIdVal = post.id;
+    const encoder = new TextEncoder();
+    const data = encoder.encode(`${titleVal}||${bodyVal}||${postIdVal}`);
+    const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    const hash = hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
+    setCurrentHash(hash);
+    setVerifyPostId(postIdVal);
+    try {
+      const cfg = await loadConfig();
+      setCanisterId(cfg.backend_canister_id);
+    } catch {
+      setCanisterId("");
+    }
+    setShowVerify(true);
+  };
+
+  const handleCopyHash = async () => {
+    try {
+      await navigator.clipboard.writeText(currentHash);
+      setHashCopied(true);
+      setTimeout(() => setHashCopied(false), 2000);
+    } catch {
+      toast.error("Kunde inte kopiera.");
     }
   };
 
@@ -410,6 +460,17 @@ export default function PostView({
                       )}
                   </button>
                 )}
+
+                {/* Verify button - visible to all */}
+                <button
+                  type="button"
+                  data-ocid="post.verify.button"
+                  onClick={handleVerify}
+                  className="flex items-center gap-1.5 px-4 py-2.5 min-h-[44px] rounded-full text-sm font-medium border border-green-200 text-green-700 hover:bg-green-50 transition-all touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <ShieldCheck className="w-4 h-4" />
+                  Verifiera
+                </button>
               </div>
 
               <div className="flex items-center gap-2">
@@ -495,6 +556,92 @@ export default function PostView({
       </main>
 
       <ScrollToTop />
+
+      {/* Verify Dialog */}
+      <Dialog open={showVerify} onOpenChange={setShowVerify}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ShieldCheck className="w-5 h-5 text-green-600" />
+              Verifiera äkthet
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 text-sm">
+            <p className="text-muted-foreground">
+              Nedanstående hash beräknas från inläggets titel, innehåll och ID.
+              Om hashen matchar kan du bekräfta att texten är oförändrad.
+            </p>
+
+            <div className="space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="font-medium text-foreground">
+                  Aktuell innehållshash (SHA-256)
+                </span>
+                <button
+                  type="button"
+                  onClick={handleCopyHash}
+                  className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {hashCopied ? (
+                    <CheckCircle2 className="w-3.5 h-3.5 text-green-600" />
+                  ) : (
+                    <Copy className="w-3.5 h-3.5" />
+                  )}
+                  {hashCopied ? "Kopierad" : "Kopiera"}
+                </button>
+              </div>
+              <code className="block w-full bg-muted p-2 rounded text-xs font-mono break-all text-foreground">
+                {currentHash || "Beräknar..."}
+              </code>
+            </div>
+
+            {canisterId && (
+              <a
+                href={`https://dashboard.internetcomputer.org/canister/${canisterId}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 text-blue-600 hover:text-blue-700 hover:underline"
+              >
+                <ExternalLink className="w-4 h-4" />
+                Visa canister på ICP Dashboard
+              </a>
+            )}
+
+            {hashHistory && hashHistory.length > 1 && (
+              <div className="space-y-2">
+                <div className="flex items-center gap-1.5 font-medium text-foreground">
+                  <Clock className="w-4 h-4" />
+                  Versionshistorik
+                </div>
+                <div className="max-h-48 overflow-y-auto space-y-1.5">
+                  {[...hashHistory].reverse().map((entry, i) => (
+                    <div
+                      key={`${entry[0]}-${entry[1]}`}
+                      className="bg-muted rounded p-2 space-y-0.5"
+                    >
+                      <div className="flex items-center justify-between text-xs text-muted-foreground">
+                        <span>
+                          {i === 0
+                            ? "Aktuell version"
+                            : `Version ${hashHistory.length - i}`}
+                        </span>
+                        <span>
+                          {new Date(
+                            Number(entry[1]) / 1_000_000,
+                          ).toLocaleString("sv-SE")}
+                        </span>
+                      </div>
+                      <code className="block text-xs font-mono break-all text-foreground/80">
+                        {entry[0]}
+                      </code>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <footer className="py-5 text-center text-xs text-muted-foreground border-t border-border">
         © {new Date().getFullYear()}.{" "}

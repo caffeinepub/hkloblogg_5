@@ -94,7 +94,7 @@ export interface backendInterface {
     blockUser(user: Principal): Promise<void>;
     createCategory(name: string): Promise<void>;
     createComment(postId: string, body: string, parentId: string | null): Promise<void>;
-    createPost(title: string, body: string, categoryId: string): Promise<void>;
+    createPost(title: string, body: string, categoryId: string): Promise<string>;
     deleteCategory(id: string): Promise<void>;
     toggleCategoryHidden(id: string, hidden: boolean): Promise<void>;
     getHiddenCategoryIds(): Promise<Array<string>>;
@@ -108,6 +108,8 @@ export interface backendInterface {
     deleteUser(user: Principal): Promise<void>;
     editComment(commentId: string, body: string): Promise<void>;
     editPost(postId: string, title: string, body: string, categoryId: string): Promise<void>;
+    recordPostHash(postId: string, hash: string): Promise<void>;
+    getPostHashHistory(postId: string): Promise<Array<[string, bigint]>>;
     getAllMedia(): Promise<Array<MediaFile>>;
     getCallerUserRole(): Promise<UserRole>;
     getMediaForComment(commentId: bigint): Promise<Array<MediaFile>>;

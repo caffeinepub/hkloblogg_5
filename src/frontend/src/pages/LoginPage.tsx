@@ -87,9 +87,10 @@ export default function LoginPage() {
               </span>
             </div>
             <p className="text-xs text-muted-foreground leading-relaxed">
-              Alla transaktioner och ändringar loggas offentligt på blockkedjan.
-              Detta innebär att du och andra användare alltid kan verifiera
-              äktheten i det som publiceras.
+              Bloggen drivs på Internet Computer Protocol (ICP), en
+              decentraliserad blockkedja. Det innebär att plattformens kod och
+              data är driftsatt på ICP och kan verifieras -- ingen enskild part
+              kontrollerar eller kan manipulera infrastrukturen.
             </p>
           </motion.div>
 

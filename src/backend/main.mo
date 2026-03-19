@@ -140,6 +140,9 @@ actor {
   var cleanupLogs = Map.empty<Nat, CleanupLog>();
   var nextLogId = 1;
 
+  // Content hash history: postId -> list of (hash, timestamp)
+  var postHashHistory = Map.empty<Text, List.List<(Text, Int)>>();
+
   func requireActiveUser(caller : Principal) : UserProfile {
     switch (userProfiles.get(caller)) {
       case (null) { Runtime.trap("Unauthorized: Must be registered") };
@@ -652,7 +655,7 @@ actor {
 
   // ====== END SCHEDULED CLEANUP API ======
 
-  public shared ({ caller }) func createPost(title : Text, body : Text, categoryId : Text) : async () {
+  public shared ({ caller }) func createPost(title : Text, body : Text, categoryId : Text) : async Text {
     let _ = requireActiveUser(caller);
     if (not categories.containsKey(categoryId)) { Runtime.trap("Category not found") };
     let postId = Time.now().toText();
@@ -663,6 +666,7 @@ actor {
       pinned = false; likeCount = 0;
     };
     posts.add(postId, post);
+    postId
   };
 
   public shared ({ caller }) func editPost(postId : Text, title : Text, body : Text, categoryId : Text) : async () {
@@ -676,6 +680,30 @@ actor {
         };
         posts.add(postId, { existingPost with title; body; categoryId; updatedAt = Time.now() });
       };
+    };
+  };
+
+  public shared ({ caller }) func recordPostHash(postId : Text, hash : Text) : async () {
+    switch (posts.get(postId)) {
+      case (null) { Runtime.trap("Post not found") };
+      case (?post) {
+        if (post.authorPrincipal != caller and not isModeratorOrAdmin(caller)) {
+          Runtime.trap("Unauthorized");
+        };
+        let existing = switch (postHashHistory.get(postId)) {
+          case (null) { List.empty<(Text, Int)>() };
+          case (?l) { l };
+        };
+        existing.add((hash, Time.now()));
+        postHashHistory.add(postId, existing);
+      };
+    };
+  };
+
+  public query func getPostHashHistory(postId : Text) : async [(Text, Int)] {
+    switch (postHashHistory.get(postId)) {
+      case (null) { [] };
+      case (?list) { list.toArray() };
     };
   };
 

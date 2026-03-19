@@ -18,7 +18,6 @@ import MediaUploader, {
   compressImage,
 } from "../components/MediaUploader";
 import RichEditor from "../components/RichEditor";
-import { useActor } from "../hooks/useActor";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import { useMediaUpload } from "../hooks/useMediaUpload";
 import {
@@ -27,6 +26,7 @@ import {
   useGetPost,
   useIsAdmin,
   useListCategories,
+  useRecordPostHash,
 } from "../hooks/useQueries";
 
 interface PostFormProps {
@@ -41,6 +41,19 @@ function stripHtml(html: string): string {
   return html.replace(/<[^>]*>/g, "").trim();
 }
 
+async function computeContentHash(
+  title: string,
+  body: string,
+  postId: string,
+): Promise<string> {
+  const content = `${title}||${body}||${postId}`;
+  const encoder = new TextEncoder();
+  const data = encoder.encode(content);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
 export default function PostForm({
   mode,
   postId,
@@ -48,13 +61,13 @@ export default function PostForm({
   onSuccess,
   onAdminPanel,
 }: PostFormProps) {
-  const { clear, identity } = useInternetIdentity();
+  const { clear } = useInternetIdentity();
   const { data: isAdmin } = useIsAdmin();
   const { data: categories } = useListCategories();
   const { data: existingPost } = useGetPost(postId ?? null);
   const createPost = useCreatePost();
   const editPost = useEditPost();
-  const { actor } = useActor();
+  const recordPostHash = useRecordPostHash();
   const { uploadFiles, uploading, progress } = useMediaUpload();
 
   const [title, setTitle] = useState("");
@@ -103,42 +116,37 @@ export default function PostForm({
 
     try {
       if (mode === "create") {
-        await createPost.mutateAsync({
+        const newPostId = await createPost.mutateAsync({
           title: title.trim(),
           body,
           categoryId,
         });
 
-        // Upload media if any staged files (find new post after creation)
-        const validFiles = stagedFiles.filter((sf) => !sf.error);
-        if (validFiles.length > 0 && actor) {
-          try {
-            // Get the newly created post by finding the most recent post by this user
-            const allPosts = await actor.listPosts(null);
-            const myPrincipal = identity?.getPrincipal().toString();
-            const newPost = allPosts
-              .filter(
-                (p) =>
-                  p.title === title.trim() &&
-                  p.authorPrincipal.toString() === myPrincipal,
-              )
-              .sort((a, b) => Number(b.createdAt) - Number(a.createdAt))[0];
+        // Record content hash for verification
+        try {
+          const hash = await computeContentHash(title.trim(), body, newPostId);
+          await recordPostHash.mutateAsync({ postId: newPostId, hash });
+        } catch {
+          // Non-critical: hash recording failed
+        }
 
-            if (newPost) {
-              const filesToUpload = await Promise.all(
-                validFiles.map(async (sf) => {
-                  if (sf.compress && sf.file.type.startsWith("image/")) {
-                    try {
-                      return await compressImage(sf.file);
-                    } catch {
-                      return sf.file;
-                    }
+        // Upload media if any staged files
+        const validFiles = stagedFiles.filter((sf) => !sf.error);
+        if (validFiles.length > 0 && newPostId) {
+          try {
+            const filesToUpload = await Promise.all(
+              validFiles.map(async (sf) => {
+                if (sf.compress && sf.file.type.startsWith("image/")) {
+                  try {
+                    return await compressImage(sf.file);
+                  } catch {
+                    return sf.file;
                   }
-                  return sf.file;
-                }),
-              );
-              await uploadFiles(filesToUpload, BigInt(newPost.id), null);
-            }
+                }
+                return sf.file;
+              }),
+            );
+            await uploadFiles(filesToUpload, BigInt(newPostId), null);
           } catch {
             // Media upload failed but post was created - show warning
             toast.warning(
@@ -148,7 +156,7 @@ export default function PostForm({
         }
 
         toast.success("Inlägget publicerades!");
-        onSuccess("");
+        onSuccess(newPostId ?? "");
       } else if (postId) {
         await editPost.mutateAsync({
           postId,
@@ -179,6 +187,14 @@ export default function PostForm({
               "Ändringarna sparades men media kunde inte laddas upp.",
             );
           }
+        }
+
+        // Record content hash for verification
+        try {
+          const hash = await computeContentHash(title.trim(), body, postId);
+          await recordPostHash.mutateAsync({ postId, hash });
+        } catch {
+          // Non-critical: hash recording failed
         }
 
         toast.success("Ändringarna sparades!");

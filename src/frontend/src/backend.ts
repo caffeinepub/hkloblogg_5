@@ -169,7 +169,7 @@ export interface backendInterface {
     blockUser(user: Principal): Promise<void>;
     createCategory(name: string): Promise<void>;
     createComment(postId: string, body: string, parentId: string | null): Promise<void>;
-    createPost(title: string, body: string, categoryId: string): Promise<void>;
+    createPost(title: string, body: string, categoryId: string): Promise<string>;
     deleteCategory(id: string): Promise<void>;
     deleteComment(commentId: string): Promise<void>;
     deleteMedia(mediaId: bigint): Promise<void>;
@@ -178,6 +178,8 @@ export interface backendInterface {
     deleteUser(user: Principal): Promise<void>;
     editComment(commentId: string, body: string): Promise<void>;
     editPost(postId: string, title: string, body: string, categoryId: string): Promise<void>;
+    recordPostHash(postId: string, hash: string): Promise<void>;
+    getPostHashHistory(postId: string): Promise<Array<[string, bigint]>>;
     getAllMedia(): Promise<Array<MediaFile>>;
     getCallerUserRole(): Promise<UserRole>;
     getMediaForComment(commentId: bigint): Promise<Array<MediaFile>>;
@@ -370,7 +372,7 @@ export class Backend implements backendInterface {
             return result;
         }
     }
-    async createPost(arg0: string, arg1: string, arg2: string): Promise<void> {
+    async createPost(arg0: string, arg1: string, arg2: string): Promise<string> {
         if (this.processError) {
             try {
                 const result = await this.actor.createPost(arg0, arg1, arg2);
@@ -1114,6 +1116,34 @@ export class Backend implements backendInterface {
             }
         } else {
             const result = await (this.actor as any).listCleanupLogs(arg0);
+            return result;
+        }
+    }
+    async recordPostHash(postId: string, hash: string): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await (this.actor as any).recordPostHash(postId, hash);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await (this.actor as any).recordPostHash(postId, hash);
+            return result;
+        }
+    }
+    async getPostHashHistory(postId: string): Promise<Array<[string, bigint]>> {
+        if (this.processError) {
+            try {
+                const result = await (this.actor as any).getPostHashHistory(postId);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await (this.actor as any).getPostHashHistory(postId);
             return result;
         }
     }
