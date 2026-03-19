@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { BookOpen, Loader2, ShieldCheck } from "lucide-react";
+import { BookOpen, Eye, Loader2, ShieldCheck } from "lucide-react";
 import { motion } from "motion/react";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
 
@@ -73,12 +73,32 @@ export default function LoginPage() {
             </p>
           </div>
 
+          {/* Transparency notice */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.25, duration: 0.5 }}
+            className="mt-5 bg-muted/50 border border-border rounded-xl p-5"
+          >
+            <div className="flex items-center gap-2 mb-2">
+              <Eye className="w-4 h-4 text-primary flex-shrink-0" />
+              <span className="text-xs font-semibold text-foreground uppercase tracking-wide">
+                Transparens
+              </span>
+            </div>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Alla transaktioner och ändringar loggas offentligt på blockkedjan.
+              Detta innebär att du och andra användare alltid kan verifiera
+              äktheten i det som publiceras.
+            </p>
+          </motion.div>
+
           {/* GDPR clarification */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.3, duration: 0.5 }}
-            className="mt-5 bg-muted/50 border border-border rounded-xl p-5"
+            className="mt-4 bg-muted/50 border border-border rounded-xl p-5"
           >
             <div className="flex items-center gap-2 mb-2">
               <ShieldCheck className="w-4 h-4 text-primary flex-shrink-0" />
