@@ -60,7 +60,7 @@ function AppShell() {
   if (isLoading) {
     if (timedOut) {
       return (
-        <div className="min-h-screen bg-background flex flex-col">
+        <div className="min-h-screen leaf-bg-page flex flex-col">
           <div className="h-1 bg-primary w-full" />
           <div className="flex-1 flex items-center justify-center">
             <div className="text-center space-y-4 max-w-xs px-4">
@@ -100,7 +100,7 @@ function AppShell() {
     }
 
     return (
-      <div className="min-h-screen bg-background flex flex-col">
+      <div className="min-h-screen leaf-bg-page flex flex-col">
         <div className="h-1 bg-primary w-full" />
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center space-y-4">

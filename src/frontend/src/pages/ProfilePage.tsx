@@ -66,7 +66,7 @@ function RegisterForm({ onBack }: { onBack: () => void }) {
   };
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-screen leaf-bg-page flex flex-col">
       <div className="h-1 bg-primary w-full" />
 
       <header className="border-b border-border bg-card">
@@ -163,7 +163,7 @@ function RegisterForm({ onBack }: { onBack: () => void }) {
         </motion.div>
       </main>
 
-      <footer className="py-5 text-center text-xs text-muted-foreground border-t border-border">
+      <footer className="py-6 text-center text-xs text-muted-foreground border-t border-border leaf-bg-footer">
         © {new Date().getFullYear()}.{" "}
         <a
           href={`https://caffeine.ai?utm_source=caffeine-footer&utm_medium=referral&utm_content=${encodeURIComponent(window.location.hostname)}`}
@@ -215,7 +215,7 @@ export default function ProfilePage({
   };
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-screen leaf-bg-page flex flex-col">
       <div className="h-1 bg-primary w-full" />
 
       <header className="border-b border-border bg-card">
@@ -374,7 +374,7 @@ export default function ProfilePage({
         </motion.div>
       </main>
 
-      <footer className="py-5 text-center text-xs text-muted-foreground border-t border-border">
+      <footer className="py-6 text-center text-xs text-muted-foreground border-t border-border leaf-bg-footer">
         © {new Date().getFullYear()}.{" "}
         <a
           href={`https://caffeine.ai?utm_source=caffeine-footer&utm_medium=referral&utm_content=${encodeURIComponent(window.location.hostname)}`}

@@ -1,37 +1,25 @@
 # HKLOblogg
 
 ## Current State
-The blog has a horizontal scrollable category filter row directly below the sticky header. It shows pill-shaped buttons for each category (Alla, Teknik, Livsberättelser, Videos, etc.). This row is visible on both desktop and mobile.
+Bloggen har en ljus blå/grå palett. Ingen bakgrundstextur eller dekorativa bilder används för närvarande på webbplatsen.
 
 ## Requested Changes (Diff)
 
 ### Add
-- A slim navigation bar below the header with three shortcut links: "Hem", "Mitt flöde", "Nytt inlägg"
-- A hamburger menu button (three-line icon) in the same navigation bar, visible on both desktop and mobile
-- A bottom sheet component that slides up from the bottom of the screen when hamburger is clicked
-- Category list inside the bottom sheet (all categories, with "Alla" option)
-- Active category highlighted in the bottom sheet
-- Swipe-down gesture to dismiss the bottom sheet
-- Backdrop overlay behind the bottom sheet (click to close)
-- Currently selected category shown as a chip/badge next to the hamburger button (so user knows which category is active)
+- Bladmönsterbilden (`/assets/uploads/20260319_111140-1.jpg`) används som dekorativt element på hela webbplatsen med varierad opacitet beroende på plats.
 
 ### Modify
-- Remove the existing horizontal scrollable category filter row
-- The category selection logic remains the same -- selecting a category in the bottom sheet filters the feed
+- **Inloggningssidan:** Bladmönstret som helbakgrundsbild med vit/ljus semi-transparent overlay för läsbarhet. Tydligare utsmyckning.
+- **Sidans body/main bakgrund:** Mycket subtil vattenstämpel (~6% opacitet) som täcker hela sidans bakgrund.
+- **Sidfoten:** Bladmönsterband med medium opacitet (~25%) som dekorativt bakgrundselement.
+- **Tomma vyer** (empty states för inga inlägg, inga notiser etc.): Bladmönster med ~15% opacitet som utfyllnad.
 
 ### Remove
-- Horizontal category pill row below the header
+- Inget tas bort.
 
 ## Implementation Plan
-1. Create a `CategoryBottomSheet` component with:
-   - Animated slide-up from bottom (CSS transform transition)
-   - Backdrop overlay
-   - Touch/mouse swipe-down to dismiss (track touchstart/touchmove/touchend)
-   - List of category buttons, active one highlighted
-   - Close button at top
-2. Create a `SubNavBar` component that replaces the category row:
-   - Shortcut links: Hem, Mitt flöde, Nytt inlägg (using existing navigation)
-   - Hamburger icon button on the right side
-   - Small badge showing currently selected category name
-3. Remove the old category filter row from the main feed/home page
-4. Wire category state between SubNavBar, CategoryBottomSheet, and the post feed
+1. Lägg till global CSS i `index.css` eller via inline styles för body-bakgrundstextur med bladmönstret vid ~6% opacitet.
+2. Uppdatera `LoginPage.tsx` (eller motsvarande) med bladmönster som hero-bakgrund med overlay.
+3. Uppdatera sidfoten med dekorativt bladmönsterband.
+4. Uppdatera empty state-komponenter med subtilt mönster.
+5. Säkerställ att all text förblir läsbar med tillräcklig kontrast.

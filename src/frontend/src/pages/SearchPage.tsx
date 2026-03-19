@@ -33,7 +33,7 @@ export default function SearchPage({
   const hasResults = posts.length > 0 || comments.length > 0;
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-screen leaf-bg-page flex flex-col">
       <div className="h-1 bg-primary w-full" />
 
       <header className="border-b border-border bg-card sticky top-0 z-20">
@@ -208,7 +208,7 @@ export default function SearchPage({
         )}
       </main>
 
-      <footer className="py-5 text-center text-xs text-muted-foreground border-t border-border">
+      <footer className="py-6 text-center text-xs text-muted-foreground border-t border-border leaf-bg-footer">
         © {new Date().getFullYear()}.{" "}
         <a
           href={`https://caffeine.ai?utm_source=caffeine-footer&utm_medium=referral&utm_content=${encodeURIComponent(window.location.hostname)}`}

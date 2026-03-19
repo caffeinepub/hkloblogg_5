@@ -7,7 +7,7 @@ export default function LoginPage() {
   const { login, isLoggingIn, isInitializing } = useInternetIdentity();
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-screen leaf-bg-login flex flex-col">
       {/* Decorative top bar */}
       <div className="h-1 bg-primary w-full" />
 
@@ -125,7 +125,7 @@ export default function LoginPage() {
         </motion.div>
       </main>
 
-      <footer className="py-5 text-center text-xs text-muted-foreground">
+      <footer className="py-6 text-center text-xs text-muted-foreground leaf-bg-footer">
         © {new Date().getFullYear()}.{" "}
         <a
           href={`https://caffeine.ai?utm_source=caffeine-footer&utm_medium=referral&utm_content=${encodeURIComponent(window.location.hostname)}`}

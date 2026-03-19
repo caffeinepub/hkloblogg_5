@@ -181,3 +181,39 @@
   top: 7px;
   z-index: 5;
 }
+
+/* ─── Leaf pattern decorative backgrounds ──────────────────────────── */
+/* --background value: 0.975 0.006 240 */
+
+/* Global page background: 6% leaf pattern visible */
+.leaf-bg-page {
+  background: linear-gradient(
+      oklch(0.975 0.006 240 / 0.94),
+      oklch(0.975 0.006 240 / 0.94)
+    ), url("/assets/uploads/20260319_111140-1.jpg") center / cover fixed;
+}
+
+/* Login page: 18% leaf pattern visible for visual interest */
+.leaf-bg-login {
+  background: linear-gradient(
+      oklch(0.975 0.006 240 / 0.82),
+      oklch(0.975 0.006 240 / 0.82)
+    ), url("/assets/uploads/20260319_111140-1.jpg") center / cover fixed;
+}
+
+/* Footer strip: 25% leaf pattern — decorative accent */
+.leaf-bg-footer {
+  background: linear-gradient(
+      oklch(0.975 0.006 240 / 0.75),
+      oklch(0.975 0.006 240 / 0.75)
+    ), url("/assets/uploads/20260319_111140-1.jpg") center / cover;
+}
+
+/* Empty state panels: 15% leaf pattern as atmospheric fill */
+.leaf-bg-empty {
+  border-radius: 0.75rem;
+  background: linear-gradient(
+      oklch(0.975 0.006 240 / 0.85),
+      oklch(0.975 0.006 240 / 0.85)
+    ), url("/assets/uploads/20260319_111140-1.jpg") center / cover;
+}

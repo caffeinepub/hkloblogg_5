@@ -165,7 +165,7 @@ export default function MittFlodePage({
   );
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-screen leaf-bg-page flex flex-col">
       <div className="h-1 bg-primary w-full" />
 
       <header className="border-b border-border bg-card sticky top-0 z-20">
@@ -229,7 +229,7 @@ export default function MittFlodePage({
                 ))}
               </div>
             ) : sortedUserPosts.length === 0 ? (
-              <div className="py-20 text-center">
+              <div className="py-20 text-center leaf-bg-empty">
                 <Users
                   className="w-10 h-10 text-muted-foreground/40 mx-auto mb-4"
                   strokeWidth={1}
@@ -274,7 +274,7 @@ export default function MittFlodePage({
                 ))}
               </div>
             ) : (followedPostIds ?? []).length === 0 ? (
-              <div className="py-20 text-center">
+              <div className="py-20 text-center leaf-bg-empty">
                 <Rss
                   className="w-10 h-10 text-muted-foreground/40 mx-auto mb-4"
                   strokeWidth={1}
@@ -304,7 +304,7 @@ export default function MittFlodePage({
         </Tabs>
       </main>
 
-      <footer className="py-5 text-center text-xs text-muted-foreground border-t border-border">
+      <footer className="py-6 text-center text-xs text-muted-foreground border-t border-border leaf-bg-footer">
         © {new Date().getFullYear()}.{" "}
         <a
           href={`https://caffeine.ai?utm_source=caffeine-footer&utm_medium=referral&utm_content=${encodeURIComponent(window.location.hostname)}`}
