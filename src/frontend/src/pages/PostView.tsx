@@ -39,6 +39,8 @@ import {
   Shield,
   ShieldCheck,
   Trash2,
+  UserCheck,
+  UserPlus,
 } from "lucide-react";
 import { motion } from "motion/react";
 import { useState } from "react";
@@ -55,17 +57,20 @@ import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import {
   useDeletePost,
   useFollowPost,
+  useFollowUser,
   useGetPost,
   useGetPostFollowerCount,
   useGetPostHashHistory,
   useIsAdmin,
   useIsFollowingPost,
+  useIsFollowingUser,
   useIsModerator,
   useLikePost,
   useListCategories,
   useMyLikedPosts,
   usePinPost,
   useUnfollowPost,
+  useUnfollowUser,
 } from "../hooks/useQueries";
 import { useStorageClient } from "../hooks/useStorageClient";
 import { readTime } from "../lib/readTime";
@@ -98,6 +103,9 @@ export default function PostView({
   const unfollowPost = useUnfollowPost();
   const { data: isFollowing } = useIsFollowingPost(postId);
   const { data: followerCount } = useGetPostFollowerCount(postId);
+  const followUser = useFollowUser();
+  const unfollowUser = useUnfollowUser();
+  const { data: isFollowingAuthor } = useIsFollowingUser(post?.authorPrincipal);
   const { actor } = useActor();
   const storageClient = useStorageClient();
   const [searchInput, setSearchInput] = useState("");
@@ -163,6 +171,21 @@ export default function PostView({
       toast.success(post.pinned ? "Inlägg lossades." : "Inlägg fastnålades.");
     } catch {
       toast.error("Kunde inte ändra fastnålning.");
+    }
+  };
+
+  const handleFollowAuthor = async () => {
+    if (!post) return;
+    try {
+      if (isFollowingAuthor) {
+        await unfollowUser.mutateAsync(post.authorPrincipal);
+        toast.success("Du följer inte längre författaren.");
+      } else {
+        await followUser.mutateAsync(post.authorPrincipal);
+        toast.success("Du följer nu författaren.");
+      }
+    } catch {
+      toast.error("Kunde inte ändra följning.");
     }
   };
 
@@ -356,6 +379,25 @@ export default function PostView({
                 principal={post.authorPrincipal}
                 className="font-medium text-foreground"
               />
+              {identity && !isAuthor && (
+                <button
+                  type="button"
+                  onClick={handleFollowAuthor}
+                  disabled={followUser.isPending || unfollowUser.isPending}
+                  className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border transition-all touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                    isFollowingAuthor
+                      ? "bg-blue-50 border-blue-200 text-blue-600 hover:bg-blue-100"
+                      : "border-border text-muted-foreground hover:text-foreground hover:border-foreground/30 hover:bg-muted"
+                  }`}
+                >
+                  {isFollowingAuthor ? (
+                    <UserCheck className="w-3 h-3" />
+                  ) : (
+                    <UserPlus className="w-3 h-3" />
+                  )}
+                  {isFollowingAuthor ? "Följer" : "Följ"}
+                </button>
+              )}
               <span>·</span>
               <time
                 dateTime={new Date(

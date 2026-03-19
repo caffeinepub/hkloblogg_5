@@ -719,6 +719,19 @@ export function useGetFollowedPosts() {
   });
 }
 
+export function useIsFollowingUser(
+  principal: import("@icp-sdk/core/principal").Principal | undefined,
+) {
+  const { actor, isFetching } = useActor();
+  return useQuery<boolean>({
+    queryKey: ["isFollowingUser", principal?.toString()],
+    queryFn: async () => {
+      if (!actor || !principal) return false;
+      return fullActor(actor).isFollowingUser(principal);
+    },
+    enabled: !!actor && !isFetching && !!principal,
+  });
+}
 // ── Notification hooks ───────────────────────────────────────────────────────
 
 export function useGetMyNotifications() {
