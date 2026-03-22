@@ -20,6 +20,8 @@ import { toast } from "sonner";
 import { UserRole } from "../backend.d";
 import type { UserProfile } from "../backend.d";
 import { useDeleteMyAccount, useRegister } from "../hooks/useQueries";
+import { useLang } from "../locales/LanguageContext";
+import { translations } from "../locales/translations";
 
 interface ProfilePageProps {
   profile: UserProfile | null;
@@ -29,6 +31,8 @@ interface ProfilePageProps {
 
 function RegisterForm({ onBack }: { onBack: () => void }) {
   const register = useRegister();
+  const { lang } = useLang();
+  const t = translations[lang];
   const [alias, setAlias] = useState("");
   const [error, setError] = useState("");
 
@@ -37,30 +41,30 @@ function RegisterForm({ onBack }: { onBack: () => void }) {
     setError("");
     const trimmed = alias.trim();
     if (trimmed.length < 2) {
-      setError("Visningsnamnet måste vara minst 2 tecken.");
+      setError(t.aliasRequired);
       return;
     }
     if (trimmed.length > 32) {
-      setError("Visningsnamnet får vara högst 32 tecken.");
+      setError(t.aliasRequired);
       return;
     }
     try {
       await register.mutateAsync(trimmed);
-      toast.success("Välkommen! Ditt visningsnamn är nu sparat.");
+      toast.success(t.saved);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       if (
         msg.toLowerCase().includes("taken") ||
         msg.toLowerCase().includes("already")
       ) {
-        setError("Det visningsnamnet är redan taget. Välj ett annat.");
+        setError(t.aliasAlreadyTaken);
       } else if (
         msg.toLowerCase().includes("too short") ||
         msg.toLowerCase().includes("short")
       ) {
-        setError("Visningsnamnet är för kort.");
+        setError(t.aliasRequired);
       } else {
-        setError("Något gick fel. Försök igen.");
+        setError(t.errorOccurred);
       }
     }
   };
@@ -79,13 +83,13 @@ function RegisterForm({ onBack }: { onBack: () => void }) {
             className="text-muted-foreground -ml-2"
           >
             <ArrowLeft className="w-4 h-4 mr-1" />
-            Tillbaka
+            {t.back}
           </Button>
           <Separator orientation="vertical" className="h-5" />
           <div className="flex items-center gap-2">
             <BookOpen className="w-5 h-5 text-primary" strokeWidth={1.5} />
             <span className="font-display text-xl text-foreground">
-              HKLOblogg
+              {t.blogTitle}
             </span>
           </div>
         </div>
@@ -100,11 +104,9 @@ function RegisterForm({ onBack }: { onBack: () => void }) {
         >
           <div>
             <h1 className="font-display text-3xl text-foreground mb-2">
-              Välkommen till HKLOblogg
+              {t.welcomeToHKLO}
             </h1>
-            <p className="text-muted-foreground">
-              Välj ett visningsnamn för att komma igång.
-            </p>
+            <p className="text-muted-foreground">{t.chooseDisplayName}</p>
           </div>
 
           <div className="bg-card border border-border rounded-xl p-6 shadow-card">
@@ -114,17 +116,17 @@ function RegisterForm({ onBack }: { onBack: () => void }) {
               </div>
               <div>
                 <h2 className="font-display text-lg text-foreground">
-                  Skapa ditt konto
+                  {t.createAccount}
                 </h2>
                 <p className="text-sm text-muted-foreground">
-                  Visningsnamnet syns på alla dina inlägg och kommentarer.
+                  {t.displayNameVisible}
                 </p>
               </div>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="register-alias">Visningsnamn</Label>
+                <Label htmlFor="register-alias">{t.displayName}</Label>
                 <Input
                   id="register-alias"
                   data-ocid="profile.register.input"
@@ -133,7 +135,7 @@ function RegisterForm({ onBack }: { onBack: () => void }) {
                     setAlias(e.target.value);
                     setError("");
                   }}
-                  placeholder="Ditt namn eller alias (2–32 tecken)"
+                  placeholder={t.displayNamePlaceholder}
                   autoComplete="off"
                   autoFocus
                   maxLength={32}
@@ -156,7 +158,7 @@ function RegisterForm({ onBack }: { onBack: () => void }) {
                 {register.isPending ? (
                   <Loader2 className="w-4 h-4 animate-spin mr-2" />
                 ) : null}
-                Registrera
+                {t.register}
               </Button>
             </form>
           </div>
@@ -171,7 +173,7 @@ function RegisterForm({ onBack }: { onBack: () => void }) {
           rel="noopener noreferrer"
           className="hover:text-foreground transition-colors"
         >
-          Byggd med ❤ via caffeine.ai
+          {t.footerBuilt}
         </a>
       </footer>
     </div>
@@ -184,6 +186,8 @@ export default function ProfilePage({
   onLogout,
 }: ProfilePageProps) {
   const deleteMyAccount = useDeleteMyAccount();
+  const { lang } = useLang();
+  const t = translations[lang];
   const [confirmAlias, setConfirmAlias] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
 
@@ -206,11 +210,11 @@ export default function ProfilePage({
     if (!aliasMatches) return;
     try {
       await deleteMyAccount.mutateAsync();
-      toast.success("Ditt konto har raderats.");
+      toast.success(t.accountDeleted);
       setDialogOpen(false);
       onLogout();
     } catch {
-      toast.error("Kunde inte radera kontot. Försök igen.");
+      toast.error(t.errorOccurred);
     }
   };
 
@@ -228,13 +232,13 @@ export default function ProfilePage({
             className="text-muted-foreground -ml-2"
           >
             <ArrowLeft className="w-4 h-4 mr-1" />
-            Tillbaka
+            {t.back}
           </Button>
           <Separator orientation="vertical" className="h-5" />
           <div className="flex items-center gap-2">
             <BookOpen className="w-5 h-5 text-primary" strokeWidth={1.5} />
             <span className="font-display text-xl text-foreground">
-              HKLOblogg
+              {t.blogTitle}
             </span>
           </div>
         </div>
@@ -247,7 +251,9 @@ export default function ProfilePage({
           transition={{ duration: 0.4 }}
           className="space-y-8"
         >
-          <h1 className="font-display text-3xl text-foreground">Min profil</h1>
+          <h1 className="font-display text-3xl text-foreground">
+            {t.myProfile}
+          </h1>
 
           <div className="bg-card border border-border rounded-xl p-6 shadow-card space-y-6">
             <div className="flex items-center gap-4">
@@ -263,11 +269,11 @@ export default function ProfilePage({
                     variant={isAdmin ? "default" : "secondary"}
                     className="text-xs"
                   >
-                    {isAdmin ? "Admin" : "Användare"}
+                    {isAdmin ? t.admin : t.user}
                   </Badge>
                 </div>
                 <p className="text-sm text-muted-foreground mt-0.5">
-                  Registrerad {registeredDate}
+                  {t.registered} {registeredDate}
                 </p>
               </div>
             </div>
@@ -276,18 +282,18 @@ export default function ProfilePage({
 
             <div className="space-y-2">
               <h3 className="text-sm font-medium text-foreground">
-                Kontoinformation
+                {t.accountInfo}
               </h3>
               <div className="grid grid-cols-2 gap-y-2 text-sm">
-                <span className="text-muted-foreground">Visningsnamn</span>
+                <span className="text-muted-foreground">{t.displayName}</span>
                 <span className="text-foreground font-medium">
                   {profile.alias}
                 </span>
-                <span className="text-muted-foreground">Roll</span>
+                <span className="text-muted-foreground">{t.role}</span>
                 <span className="text-foreground">
-                  {isAdmin ? "Administratör" : "Användare"}
+                  {isAdmin ? t.roleAdmin : t.roleUser}
                 </span>
-                <span className="text-muted-foreground">Registrerad</span>
+                <span className="text-muted-foreground">{t.registered}</span>
                 <span className="text-foreground">{registeredDate}</span>
               </div>
             </div>
@@ -296,12 +302,9 @@ export default function ProfilePage({
           {/* Danger zone */}
           <div className="bg-card border border-destructive/30 rounded-xl p-6 shadow-card space-y-4">
             <h3 className="font-semibold text-destructive text-sm">
-              Farlig zon
+              {t.dangerZone}
             </h3>
-            <p className="text-sm text-muted-foreground">
-              Att radera ditt konto är permanent och kan inte ångras. Alla dina
-              inlägg och kommentarer kommer att raderas.
-            </p>
+            <p className="text-sm text-muted-foreground">{t.dangerZoneDesc}</p>
 
             <AlertDialog
               open={dialogOpen}
@@ -318,16 +321,14 @@ export default function ProfilePage({
                   className="gap-2"
                 >
                   <Trash2 className="w-4 h-4" />
-                  Radera mitt konto
+                  {t.deleteAccount}
                 </Button>
               </AlertDialogTrigger>
               <AlertDialogContent data-ocid="profile.delete_account.dialog">
                 <AlertDialogHeader>
-                  <AlertDialogTitle>Radera ditt konto</AlertDialogTitle>
+                  <AlertDialogTitle>{t.deleteAccount}</AlertDialogTitle>
                   <AlertDialogDescription>
-                    Detta raderar ditt konto och alla dina inlägg och
-                    kommentarer permanent. Skriv in ditt visningsnamn för att
-                    bekräfta.
+                    {t.deleteAccountWarning} {t.deleteAccountConfirm}
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <div className="py-2">
@@ -335,7 +336,7 @@ export default function ProfilePage({
                     htmlFor="confirm-alias"
                     className="text-sm font-medium mb-1.5 block"
                   >
-                    Ditt visningsnamn:{" "}
+                    {t.yourDisplayName}:{" "}
                     <span className="font-semibold text-foreground">
                       {profile.alias}
                     </span>
@@ -345,7 +346,7 @@ export default function ProfilePage({
                     data-ocid="profile.delete_account.input"
                     value={confirmAlias}
                     onChange={(e) => setConfirmAlias(e.target.value)}
-                    placeholder={`Skriv "${profile.alias}" för att bekräfta`}
+                    placeholder={`${t.typeAliasToConfirm}: "${profile.alias}"`}
                     autoComplete="off"
                   />
                 </div>
@@ -354,7 +355,7 @@ export default function ProfilePage({
                     data-ocid="profile.delete_account.cancel_button"
                     onClick={() => setConfirmAlias("")}
                   >
-                    Avbryt
+                    {t.cancel}
                   </AlertDialogCancel>
                   <Button
                     data-ocid="profile.delete_account.confirm_button"
@@ -365,7 +366,7 @@ export default function ProfilePage({
                     {deleteMyAccount.isPending ? (
                       <Loader2 className="w-4 h-4 animate-spin mr-2" />
                     ) : null}
-                    Radera
+                    {t.confirmDeleteAccount}
                   </Button>
                 </AlertDialogFooter>
               </AlertDialogContent>
@@ -382,7 +383,7 @@ export default function ProfilePage({
           rel="noopener noreferrer"
           className="hover:text-foreground transition-colors"
         >
-          Byggd med ❤ via caffeine.ai
+          {t.footerBuilt}
         </a>
       </footer>
     </div>

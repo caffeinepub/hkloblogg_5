@@ -28,6 +28,8 @@ import {
   useListCategories,
   useRecordPostHash,
 } from "../hooks/useQueries";
+import { useLang } from "../locales/LanguageContext";
+import { translations } from "../locales/translations";
 
 interface PostFormProps {
   mode: "create" | "edit";
@@ -62,6 +64,8 @@ export default function PostForm({
   onAdminPanel,
 }: PostFormProps) {
   const { clear } = useInternetIdentity();
+  const { lang } = useLang();
+  const t = translations[lang];
   const { data: isAdmin } = useIsAdmin();
   const { data: categories } = useListCategories();
   const { data: existingPost } = useGetPost(postId ?? null);
@@ -103,9 +107,9 @@ export default function PostForm({
 
   const validate = () => {
     const e: typeof errors = {};
-    if (!title.trim()) e.title = "Titel krävs.";
-    if (!stripHtml(body)) e.body = "Innehåll krävs.";
-    if (!categoryId) e.category = "Välj en kategori.";
+    if (!title.trim()) e.title = t.titleRequired;
+    if (!stripHtml(body)) e.body = t.contentRequired;
+    if (!categoryId) e.category = t.categoryRequired;
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -148,14 +152,11 @@ export default function PostForm({
             );
             await uploadFiles(filesToUpload, BigInt(newPostId), null);
           } catch {
-            // Media upload failed but post was created - show warning
-            toast.warning(
-              "Inlägget publicerades men media kunde inte laddas upp.",
-            );
+            toast.warning(t.errorOccurred);
           }
         }
 
-        toast.success("Inlägget publicerades!");
+        toast.success(t.postCreated);
         onSuccess(newPostId ?? "");
       } else if (postId) {
         await editPost.mutateAsync({
@@ -183,9 +184,7 @@ export default function PostForm({
             );
             await uploadFiles(filesToUpload, BigInt(postId), null);
           } catch {
-            toast.warning(
-              "Ändringarna sparades men media kunde inte laddas upp.",
-            );
+            toast.warning(t.errorOccurred);
           }
         }
 
@@ -197,15 +196,11 @@ export default function PostForm({
           // Non-critical: hash recording failed
         }
 
-        toast.success("Ändringarna sparades!");
+        toast.success(t.postUpdated);
         onSuccess(postId);
       }
     } catch {
-      toast.error(
-        mode === "create"
-          ? "Kunde inte publicera inlägget."
-          : "Kunde inte spara ändringarna.",
-      );
+      toast.error(t.errorOccurred);
     }
   };
 
@@ -226,13 +221,13 @@ export default function PostForm({
               className="text-muted-foreground -ml-2"
             >
               <ArrowLeft className="w-4 h-4 mr-1" />
-              Tillbaka
+              {t.back}
             </Button>
             <Separator orientation="vertical" className="h-5" />
             <div className="flex items-center gap-2">
               <BookOpen className="w-5 h-5 text-primary" strokeWidth={1.5} />
               <span className="font-display text-xl text-foreground">
-                HKLOblogg
+                {t.blogTitle}
               </span>
             </div>
           </div>
@@ -246,7 +241,7 @@ export default function PostForm({
                 className="gap-1.5 text-primary border-primary/30 hover:bg-primary/5"
               >
                 <Shield className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Adminpanel</span>
+                <span className="hidden sm:inline">{t.adminPanel}</span>
               </Button>
             )}
             <Button
@@ -256,7 +251,7 @@ export default function PostForm({
               onClick={clear}
               className="text-muted-foreground"
             >
-              Logga ut
+              {t.logout}
             </Button>
           </div>
         </div>
@@ -269,7 +264,7 @@ export default function PostForm({
           transition={{ duration: 0.4 }}
         >
           <h1 className="font-display text-3xl text-foreground mb-8">
-            {mode === "create" ? "Nytt inlägg" : "Redigera inlägg"}
+            {mode === "create" ? t.createPost : t.editPost}
           </h1>
 
           <form
@@ -282,14 +277,14 @@ export default function PostForm({
                 htmlFor="post-title"
                 className="text-foreground font-medium"
               >
-                Titel
+                {t.titleLabel}
               </Label>
               <Input
                 data-ocid="postform.title.input"
                 id="post-title"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="Inläggets titel"
+                placeholder={t.titlePlaceholder}
                 maxLength={200}
                 className="text-base"
               />
@@ -309,7 +304,7 @@ export default function PostForm({
                 htmlFor="post-category"
                 className="text-foreground font-medium"
               >
-                Kategori
+                {t.categoryLabel}
               </Label>
               <Select value={categoryId} onValueChange={setCategoryId}>
                 <SelectTrigger
@@ -317,7 +312,7 @@ export default function PostForm({
                   id="post-category"
                   className="w-full sm:w-64"
                 >
-                  <SelectValue placeholder="Välj kategori" />
+                  <SelectValue placeholder={t.selectCategory} />
                 </SelectTrigger>
                 <SelectContent>
                   {(categories ?? []).map((cat) => (
@@ -343,12 +338,12 @@ export default function PostForm({
                 htmlFor="post-body"
                 className="text-foreground font-medium"
               >
-                Innehåll
+                {t.bodyLabel}
               </Label>
               <RichEditor
                 value={body}
                 onChange={setBody}
-                placeholder="Skriv ditt inlägg här..."
+                placeholder={t.writeComment}
                 minHeight={280}
               />
               {errors.body && (
@@ -363,7 +358,9 @@ export default function PostForm({
 
             {/* Media uploader */}
             <div className="space-y-2">
-              <Label className="text-foreground font-medium">Media</Label>
+              <Label className="text-foreground font-medium">
+                {t.mediaLabel}
+              </Label>
               <MediaUploader
                 stagedFiles={stagedFiles}
                 onFilesChange={setStagedFiles}
@@ -381,7 +378,7 @@ export default function PostForm({
                 variant="ghost"
                 onClick={onBack}
               >
-                Avbryt
+                {t.cancel}
               </Button>
               <Button
                 data-ocid="postform.submit.button"
@@ -390,7 +387,7 @@ export default function PostForm({
                 className="gap-2"
               >
                 {isPending && <Loader2 className="w-4 h-4 animate-spin" />}
-                {mode === "create" ? "Publicera" : "Spara ändringar"}
+                {mode === "create" ? t.publish : t.update}
               </Button>
             </div>
           </form>
@@ -405,7 +402,7 @@ export default function PostForm({
           rel="noopener noreferrer"
           className="hover:text-foreground transition-colors"
         >
-          Byggd med ❤ via caffeine.ai
+          {t.footerBuilt}
         </a>
       </footer>
     </div>

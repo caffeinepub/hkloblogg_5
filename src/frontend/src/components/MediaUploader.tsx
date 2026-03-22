@@ -4,6 +4,8 @@ import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { ImageIcon, Loader2, Upload, VideoIcon, X } from "lucide-react";
 import { useRef, useState } from "react";
+import { useLang } from "../locales/LanguageContext";
+import { translations } from "../locales/translations";
 
 const MAX_IMAGE_SIZE = 15 * 1024 * 1024; // 15 MB
 const TARGET_COMPRESS_SIZE = 1 * 1024 * 1024; // 1 MB
@@ -51,22 +53,20 @@ export async function compressImage(file: File): Promise<File> {
         return;
       }
       ctx.drawImage(img, 0, 0, width, height);
-      // Try quality 0.8 first, then lower if still too big
       canvas.toBlob(
         (blob) => {
           if (!blob) {
-            reject(new Error("Komprimering misslyckades"));
+            reject(new Error("Compression failed"));
             return;
           }
           if (blob.size <= TARGET_COMPRESS_SIZE) {
             resolve(new File([blob], file.name, { type: "image/jpeg" }));
             return;
           }
-          // Try lower quality
           canvas.toBlob(
             (blob2) => {
               if (!blob2) {
-                reject(new Error("Komprimering misslyckades"));
+                reject(new Error("Compression failed"));
                 return;
               }
               resolve(new File([blob2], file.name, { type: "image/jpeg" }));
@@ -81,7 +81,7 @@ export async function compressImage(file: File): Promise<File> {
     };
     img.onerror = () => {
       URL.revokeObjectURL(url);
-      reject(new Error("Kunde inte läsa bildfilen"));
+      reject(new Error("Could not read image file"));
     };
     img.src = url;
   });
@@ -94,6 +94,8 @@ export default function MediaUploader({
   progress = 0,
   disabled = false,
 }: MediaUploaderProps) {
+  const { lang } = useLang();
+  const t = translations[lang];
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [validating, setValidating] = useState(false);
 
@@ -110,7 +112,7 @@ export default function MediaUploader({
         newStaged.push({
           file,
           compress: false,
-          error: "Filtypen stöds inte. Använd bilder eller MP4-videor.",
+          error: t.invalidFormat,
         });
         continue;
       }
@@ -119,7 +121,7 @@ export default function MediaUploader({
         newStaged.push({
           file,
           compress: false,
-          error: `Bilden är för stor (${formatSize(file.size)}). Max 15 MB.`,
+          error: `${t.imageTooLarge} (${formatSize(file.size)}). Max 15 MB.`,
         });
         continue;
       }
@@ -128,7 +130,7 @@ export default function MediaUploader({
         newStaged.push({
           file,
           compress: false,
-          error: `Videon är för stor (${formatSize(file.size)}). Max 100 MB.`,
+          error: `${t.videoTooLarge} (${formatSize(file.size)}). Max 100 MB.`,
         });
         continue;
       }
@@ -139,7 +141,6 @@ export default function MediaUploader({
     setValidating(false);
     onFilesChange([...stagedFiles, ...newStaged]);
 
-    // Reset input so same file can be re-added
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
@@ -171,10 +172,10 @@ export default function MediaUploader({
           ) : (
             <Upload className="w-3.5 h-3.5" />
           )}
-          Lägg till media
+          {t.addMedia}
         </Button>
         <span className="text-xs text-muted-foreground">
-          Bilder: max 15 MB. Videor: MP4, max 100 MB.
+          {t.imageUploadLabel}
         </span>
       </div>
 
@@ -237,7 +238,7 @@ export default function MediaUploader({
                         htmlFor={`compress-${idx}`}
                         className="text-xs text-muted-foreground cursor-pointer"
                       >
-                        Komprimera till ~1 MB
+                        {t.compressImage}
                       </Label>
                     </div>
                   )}
@@ -248,7 +249,7 @@ export default function MediaUploader({
                   onClick={() => removeFile(idx)}
                   disabled={uploading}
                   className="flex-shrink-0 text-muted-foreground hover:text-destructive transition-colors mt-0.5"
-                  aria-label="Ta bort fil"
+                  aria-label={t.removeFile}
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -262,7 +263,7 @@ export default function MediaUploader({
       {uploading && (
         <div data-ocid="media.loading_state" className="space-y-1">
           <div className="flex justify-between text-xs text-muted-foreground">
-            <span>Laddar upp…</span>
+            <span>{t.uploading}</span>
             <span>{Math.round(progress)}%</span>
           </div>
           <Progress value={progress} className="h-1.5" />

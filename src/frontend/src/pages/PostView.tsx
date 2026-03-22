@@ -74,6 +74,9 @@ import {
 } from "../hooks/useQueries";
 import { useStorageClient } from "../hooks/useStorageClient";
 import { readTime } from "../lib/readTime";
+import { useLang } from "../locales/LanguageContext";
+import { LANGUAGES, translations } from "../locales/translations";
+import type { Language } from "../locales/translations";
 
 interface PostViewProps {
   postId: string;
@@ -91,6 +94,8 @@ export default function PostView({
   onSearch,
 }: PostViewProps) {
   const { clear, identity } = useInternetIdentity();
+  const { lang, setLang } = useLang();
+  const t = translations[lang];
   const { data: isAdmin } = useIsAdmin();
   const { data: isModerator } = useIsModerator();
   const { data: post, isLoading } = useGetPost(postId);
@@ -134,7 +139,7 @@ export default function PostView({
 
   const categoryName =
     categories?.find((c) => c.id === post?.categoryId)?.name ??
-    "Okänd kategori";
+    t.unknownCategory;
 
   const myPrincipal = identity?.getPrincipal().toString();
   const isAuthor =
@@ -148,19 +153,19 @@ export default function PostView({
       await likePost.mutateAsync(postId);
       setLikeAnimating(true);
       setTimeout(() => setLikeAnimating(false), 600);
-      toast.success("Gillat! ❤️");
+      toast.success(t.commentLiked);
     } catch {
-      toast.error("Kunde inte gilla inlägget.");
+      toast.error(t.errorOccurred);
     }
   };
 
   const handleDelete = async () => {
     try {
       await deletePost.mutateAsync(postId);
-      toast.success("Inlägget raderades.");
+      toast.success(t.deleted);
       onBack();
     } catch {
-      toast.error("Kunde inte radera inlägget.");
+      toast.error(t.errorOccurred);
     }
   };
 
@@ -168,9 +173,9 @@ export default function PostView({
     if (!post) return;
     try {
       await pinPost.mutateAsync({ postId, pinned: !post.pinned });
-      toast.success(post.pinned ? "Inlägg lossades." : "Inlägg fastnålades.");
+      toast.success(post.pinned ? t.unpinPost : t.pinPost);
     } catch {
-      toast.error("Kunde inte ändra fastnålning.");
+      toast.error(t.errorOccurred);
     }
   };
 
@@ -179,13 +184,13 @@ export default function PostView({
     try {
       if (isFollowingAuthor) {
         await unfollowUser.mutateAsync(post.authorPrincipal);
-        toast.success("Du följer inte längre författaren.");
+        toast.success(t.unfollowPost);
       } else {
         await followUser.mutateAsync(post.authorPrincipal);
-        toast.success("Du följer nu författaren.");
+        toast.success(t.followPost);
       }
     } catch {
-      toast.error("Kunde inte ändra följning.");
+      toast.error(t.errorOccurred);
     }
   };
 
@@ -193,13 +198,13 @@ export default function PostView({
     try {
       if (isFollowing) {
         await unfollowPost.mutateAsync(postId);
-        toast.success("Du följer inte längre inlägget.");
+        toast.success(t.unfollowPost);
       } else {
         await followPost.mutateAsync(postId);
-        toast.success("Du följer nu inlägget.");
+        toast.success(t.followPost);
       }
     } catch {
-      toast.error("Kunde inte ändra följning.");
+      toast.error(t.errorOccurred);
     }
   };
 
@@ -230,7 +235,7 @@ export default function PostView({
       setHashCopied(true);
       setTimeout(() => setHashCopied(false), 2000);
     } catch {
-      toast.error("Kunde inte kopiera.");
+      toast.error(t.errorOccurred);
     }
   };
 
@@ -255,13 +260,13 @@ export default function PostView({
               className="text-muted-foreground -ml-2 focus-visible:ring-2 focus-visible:ring-ring"
             >
               <ArrowLeft className="w-4 h-4 mr-1" />
-              Tillbaka
+              {t.back}
             </Button>
             <Separator orientation="vertical" className="h-5" />
             <div className="flex items-center gap-2">
               <BookOpen className="w-5 h-5 text-primary" strokeWidth={1.5} />
               <span className="font-display text-xl text-foreground hidden sm:inline">
-                HKLOblogg
+                {t.blogTitle}
               </span>
             </div>
           </div>
@@ -277,11 +282,26 @@ export default function PostView({
                   data-ocid="post.search.input"
                   value={searchInput}
                   onChange={(e) => setSearchInput(e.target.value)}
-                  placeholder="Sök…"
+                  placeholder={t.searchPlaceholder}
                   className="pl-8 h-8 w-36 text-sm"
                 />
               </div>
             </form>
+
+            {/* Language selector */}
+            <select
+              value={lang}
+              onChange={(e) => setLang(e.target.value as Language)}
+              className="text-xs text-muted-foreground bg-transparent border border-border rounded px-1 py-0.5 cursor-pointer hover:text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+              aria-label="Select language"
+              data-ocid="post.language.select"
+            >
+              {LANGUAGES.map(({ code, flag, label }) => (
+                <option key={code} value={code}>
+                  {flag} {label}
+                </option>
+              ))}
+            </select>
 
             {/* Admin panel – desktop */}
             {isAdmin && (
@@ -293,7 +313,7 @@ export default function PostView({
                 className="hidden sm:flex gap-1.5 text-primary border-primary/30 hover:bg-primary/5"
               >
                 <Shield className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Adminpanel</span>
+                <span className="hidden sm:inline">{t.adminPanel}</span>
               </Button>
             )}
 
@@ -303,6 +323,7 @@ export default function PostView({
               variant="ghost"
               size="sm"
               onClick={clear}
+              aria-label={t.logout}
               className="hidden sm:flex text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
             >
               <LogOut className="w-4 h-4" />
@@ -323,9 +344,9 @@ export default function PostView({
           </div>
         ) : !post ? (
           <div data-ocid="post.error_state" className="py-20 text-center">
-            <p className="text-muted-foreground">Inlägget hittades inte.</p>
+            <p className="text-muted-foreground">{t.postNotFound}</p>
             <Button variant="ghost" className="mt-4" onClick={onBack}>
-              Tillbaka till flödet
+              {t.backToFeed}
             </Button>
           </div>
         ) : (
@@ -341,7 +362,7 @@ export default function PostView({
                 onClick={onBack}
                 className="hover:text-primary transition-colors hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
               >
-                Hem
+                {t.home}
               </button>
               <span>›</span>
               <span className="truncate max-w-[140px]">{categoryName}</span>
@@ -361,7 +382,7 @@ export default function PostView({
                   className="gap-1 bg-primary/10 text-primary border-primary/20"
                 >
                   <Pin className="w-3 h-3" />
-                  Fastnålad
+                  {t.pinned}
                 </Badge>
               )}
               <Badge variant="outline" className="text-muted-foreground">
@@ -374,7 +395,7 @@ export default function PostView({
             </h1>
 
             <div className="flex items-center gap-2 text-sm text-muted-foreground mb-8 flex-wrap">
-              <span>Av</span>
+              <span>{t.by}</span>
               <AuthorName
                 principal={post.authorPrincipal}
                 className="font-medium text-foreground"
@@ -395,7 +416,7 @@ export default function PostView({
                   ) : (
                     <UserPlus className="w-3 h-3" />
                   )}
-                  {isFollowingAuthor ? "Följer" : "Följ"}
+                  {isFollowingAuthor ? t.following : t.follow}
                 </button>
               )}
               <span>·</span>
@@ -416,7 +437,7 @@ export default function PostView({
                 <>
                   <span>·</span>
                   <span className="italic">
-                    Uppdaterad{" "}
+                    {t.editedOn}{" "}
                     {new Date(
                       Number(post.updatedAt) / 1_000_000,
                     ).toLocaleDateString("sv-SE")}
@@ -472,7 +493,7 @@ export default function PostView({
                     className={`w-4 h-4 ${isLiked ? "fill-rose-500" : ""}`}
                   />
                   {post.likeCount.toString()}
-                  {isLiked ? " Gillad" : " Gilla"}
+                  {isLiked ? ` ${t.liked}` : ` ${t.like}`}
                 </button>
 
                 {/* Follow button */}
@@ -493,7 +514,7 @@ export default function PostView({
                     ) : (
                       <Bell className="w-4 h-4" />
                     )}
-                    {isFollowing ? "Avfölja" : "Följ inlägg"}
+                    {isFollowing ? t.unfollowPost : t.followPost}
                     {followerCount !== undefined &&
                       followerCount > BigInt(0) && (
                         <span className="text-xs opacity-70">
@@ -511,7 +532,7 @@ export default function PostView({
                   className="flex items-center gap-1.5 px-4 py-2.5 min-h-[44px] rounded-full text-sm font-medium border border-green-200 text-green-700 hover:bg-green-50 transition-all touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   <ShieldCheck className="w-4 h-4" />
-                  Verifiera
+                  {t.verify}
                 </button>
               </div>
 
@@ -528,12 +549,12 @@ export default function PostView({
                     {post.pinned ? (
                       <>
                         <PinOff className="w-3.5 h-3.5" />
-                        Lossa
+                        {t.unpin}
                       </>
                     ) : (
                       <>
                         <Pin className="w-3.5 h-3.5" />
-                        Nåla
+                        {t.pin}
                       </>
                     )}
                   </Button>
@@ -548,7 +569,7 @@ export default function PostView({
                     className="gap-1.5 focus-visible:ring-2 focus-visible:ring-ring"
                   >
                     <Pencil className="w-3.5 h-3.5" />
-                    Redigera
+                    {t.edit}
                   </Button>
                 )}
 
@@ -562,27 +583,26 @@ export default function PostView({
                         className="gap-1.5 text-destructive border-destructive/30 hover:bg-destructive/10 hover:text-destructive focus-visible:ring-2 focus-visible:ring-ring"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
-                        Radera
+                        {t.delete}
                       </Button>
                     </AlertDialogTrigger>
                     <AlertDialogContent data-ocid="post.delete.dialog">
                       <AlertDialogHeader>
-                        <AlertDialogTitle>Radera inlägg</AlertDialogTitle>
+                        <AlertDialogTitle>{t.deletePostTitle}</AlertDialogTitle>
                         <AlertDialogDescription>
-                          Är du säker på att du vill radera inlägget &ldquo;
-                          {post.title}&rdquo;? Detta kan inte ångras.
+                          {t.deletePostConfirm} &ldquo;{post.title}&rdquo;
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>
                         <AlertDialogCancel data-ocid="post.delete.cancel_button">
-                          Avbryt
+                          {t.cancel}
                         </AlertDialogCancel>
                         <AlertDialogAction
                           data-ocid="post.delete.confirm_button"
                           onClick={handleDelete}
                           className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                         >
-                          Radera
+                          {t.confirmDelete}
                         </AlertDialogAction>
                       </AlertDialogFooter>
                     </AlertDialogContent>
@@ -605,19 +625,16 @@ export default function PostView({
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <ShieldCheck className="w-5 h-5 text-green-600" />
-              Verifiera äkthet
+              {t.verifyTitle}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 text-sm">
-            <p className="text-muted-foreground">
-              Nedanstående hash beräknas från inläggets titel, innehåll och ID.
-              Om hashen matchar kan du bekräfta att texten är oförändrad.
-            </p>
+            <p className="text-muted-foreground">{t.verifyDesc}</p>
 
             <div className="space-y-1">
               <div className="flex items-center justify-between">
                 <span className="font-medium text-foreground">
-                  Aktuell innehållshash (SHA-256)
+                  {t.contentHash}
                 </span>
                 <button
                   type="button"
@@ -629,11 +646,11 @@ export default function PostView({
                   ) : (
                     <Copy className="w-3.5 h-3.5" />
                   )}
-                  {hashCopied ? "Kopierad" : "Kopiera"}
+                  {hashCopied ? t.copied : t.copy}
                 </button>
               </div>
               <code className="block w-full bg-muted p-2 rounded text-xs font-mono break-all text-foreground">
-                {currentHash || "Beräknar..."}
+                {currentHash || t.calculating}
               </code>
             </div>
 
@@ -645,7 +662,7 @@ export default function PostView({
                 className="flex items-center gap-2 text-blue-600 hover:text-blue-700 hover:underline"
               >
                 <ExternalLink className="w-4 h-4" />
-                Visa canister på ICP Dashboard
+                {t.viewOnChain}
               </a>
             )}
 
@@ -653,7 +670,7 @@ export default function PostView({
               <div className="space-y-2">
                 <div className="flex items-center gap-1.5 font-medium text-foreground">
                   <Clock className="w-4 h-4" />
-                  Versionshistorik
+                  {t.hashHistory}
                 </div>
                 <div className="max-h-48 overflow-y-auto space-y-1.5">
                   {[...hashHistory].reverse().map((entry, i) => (
@@ -664,8 +681,8 @@ export default function PostView({
                       <div className="flex items-center justify-between text-xs text-muted-foreground">
                         <span>
                           {i === 0
-                            ? "Aktuell version"
-                            : `Version ${hashHistory.length - i}`}
+                            ? t.currentVersion
+                            : `${t.version} ${hashHistory.length - i}`}
                         </span>
                         <span>
                           {new Date(
@@ -693,7 +710,7 @@ export default function PostView({
           rel="noopener noreferrer"
           className="hover:text-foreground transition-colors"
         >
-          Byggd med ❤ via caffeine.ai
+          {t.footerBuilt}
         </a>
       </footer>
     </div>

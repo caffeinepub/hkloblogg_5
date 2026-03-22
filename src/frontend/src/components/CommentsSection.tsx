@@ -27,6 +27,8 @@ import {
   useListComments,
   useMyLikedComments,
 } from "../hooks/useQueries";
+import { useLang } from "../locales/LanguageContext";
+import { translations } from "../locales/translations";
 import AuthorName from "./AuthorName";
 import EmojiPicker from "./EmojiPicker";
 import RichEditor from "./RichEditor";
@@ -55,6 +57,7 @@ interface CommentItemProps {
   postId: string;
   depth: number;
   index: number;
+  t: Record<string, string>;
 }
 
 function CommentItem({
@@ -67,6 +70,7 @@ function CommentItem({
   postId,
   depth,
   index,
+  t,
 }: CommentItemProps) {
   const [showReplyForm, setShowReplyForm] = useState(false);
   const [replyBody, setReplyBody] = useState("");
@@ -94,9 +98,9 @@ function CommentItem({
       await likeComment.mutateAsync({ commentId: comment.id, postId });
       setLikeAnimating(true);
       setTimeout(() => setLikeAnimating(false), 600);
-      toast.success("Gillat! ❤️");
+      toast.success(t.commentLiked);
     } catch {
-      toast.error("Kunde inte gilla kommentaren.");
+      toast.error(t.errorOccurred);
     }
   };
 
@@ -110,9 +114,9 @@ function CommentItem({
       });
       setReplyBody("");
       setShowReplyForm(false);
-      toast.success("Svar skickat.");
+      toast.success(t.replyPosted);
     } catch {
-      toast.error("Kunde inte skicka svaret.");
+      toast.error(t.errorOccurred);
     }
   };
 
@@ -125,18 +129,18 @@ function CommentItem({
         postId,
       });
       setEditing(false);
-      toast.success("Kommentar uppdaterad.");
+      toast.success(t.commentUpdated);
     } catch {
-      toast.error("Kunde inte uppdatera kommentaren.");
+      toast.error(t.errorOccurred);
     }
   };
 
   const handleDelete = async () => {
     try {
       await deleteComment.mutateAsync({ commentId: comment.id, postId });
-      toast.success("Kommentar raderad.");
+      toast.success(t.deleted);
     } catch {
-      toast.error("Kunde inte radera kommentaren.");
+      toast.error(t.errorOccurred);
     }
   };
 
@@ -177,7 +181,7 @@ function CommentItem({
               <RichEditor
                 value={editBody}
                 onChange={setEditBody}
-                placeholder="Redigera kommentar…"
+                placeholder={t.writeComment}
                 minHeight={80}
               />
             </div>
@@ -191,7 +195,7 @@ function CommentItem({
                 {editComment.isPending ? (
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
                 ) : null}
-                Spara
+                {t.save}
               </Button>
               <Button
                 data-ocid="comments.edit.cancel_button"
@@ -202,7 +206,7 @@ function CommentItem({
                   setEditBody(comment.body);
                 }}
               >
-                Avbryt
+                {t.cancel}
               </Button>
             </div>
           </div>
@@ -239,7 +243,7 @@ function CommentItem({
               className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border border-transparent text-muted-foreground hover:text-foreground hover:border-border transition-all"
             >
               <MessageCircle className="w-3 h-3" />
-              Svara
+              {t.reply}
             </button>
 
             {canEdit && (
@@ -250,7 +254,7 @@ function CommentItem({
                 className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border border-transparent text-muted-foreground hover:text-foreground hover:border-border transition-all"
               >
                 <Pencil className="w-3 h-3" />
-                Redigera
+                {t.edit}
               </button>
             )}
 
@@ -263,27 +267,26 @@ function CommentItem({
                     className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border border-transparent text-destructive/60 hover:text-destructive hover:border-destructive/20 transition-all"
                   >
                     <Trash2 className="w-3 h-3" />
-                    Radera
+                    {t.delete}
                   </button>
                 </AlertDialogTrigger>
                 <AlertDialogContent data-ocid="comments.delete.dialog">
                   <AlertDialogHeader>
-                    <AlertDialogTitle>Radera kommentar</AlertDialogTitle>
+                    <AlertDialogTitle>{t.deleteCommentTitle}</AlertDialogTitle>
                     <AlertDialogDescription>
-                      Är du säker på att du vill radera kommentaren? Detta kan
-                      inte ångras.
+                      {t.deleteCommentConfirm}
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
                     <AlertDialogCancel data-ocid="comments.delete.cancel_button">
-                      Avbryt
+                      {t.cancel}
                     </AlertDialogCancel>
                     <AlertDialogAction
                       data-ocid="comments.delete.confirm_button"
                       onClick={handleDelete}
                       className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                     >
-                      Radera
+                      {t.confirmDelete}
                     </AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>
@@ -300,7 +303,7 @@ function CommentItem({
             <RichEditor
               value={replyBody}
               onChange={setReplyBody}
-              placeholder="Skriv ett svar…"
+              placeholder={t.writeReply}
               minHeight={80}
             />
           </div>
@@ -314,7 +317,7 @@ function CommentItem({
               {createComment.isPending ? (
                 <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />
               ) : null}
-              Skicka svar
+              {t.submitReply}
             </Button>
             <Button
               data-ocid="comments.reply.cancel_button"
@@ -325,7 +328,7 @@ function CommentItem({
                 setReplyBody("");
               }}
             >
-              Avbryt
+              {t.cancel}
             </Button>
           </div>
         </div>
@@ -344,6 +347,7 @@ function CommentItem({
           postId={postId}
           depth={depth + 1}
           index={index * 100 + i + 1}
+          t={t}
         />
       ))}
     </motion.div>
@@ -356,6 +360,8 @@ interface CommentsSectionProps {
 
 export default function CommentsSection({ postId }: CommentsSectionProps) {
   const { identity } = useInternetIdentity();
+  const { lang } = useLang();
+  const t = translations[lang];
   const { data: isAdmin } = useIsAdmin();
   const { data: isModerator } = useIsModerator();
   const { data: comments, isLoading } = useListComments(postId);
@@ -380,9 +386,9 @@ export default function CommentsSection({ postId }: CommentsSectionProps) {
         parentId: null,
       });
       setNewBody("");
-      toast.success("Kommentar publicerad.");
+      toast.success(t.commentPosted);
     } catch {
-      toast.error("Kunde inte publicera kommentaren.");
+      toast.error(t.errorOccurred);
     }
   };
 
@@ -390,7 +396,7 @@ export default function CommentsSection({ postId }: CommentsSectionProps) {
     <section data-ocid="comments.section" className="mt-10">
       <h2 className="font-display text-2xl text-foreground mb-6 flex items-center gap-2">
         <MessageCircle className="w-5 h-5 text-primary" strokeWidth={1.5} />
-        Kommentarer
+        {t.commentsTitle}
         {comments && (
           <span className="text-muted-foreground font-sans text-base font-normal">
             ({comments.length})
@@ -403,7 +409,7 @@ export default function CommentsSection({ postId }: CommentsSectionProps) {
         <RichEditor
           value={newBody}
           onChange={setNewBody}
-          placeholder="Skriv en kommentar…"
+          placeholder={t.writeComment}
           minHeight={100}
         />
         <div className="mt-3">
@@ -416,7 +422,7 @@ export default function CommentsSection({ postId }: CommentsSectionProps) {
             {createComment.isPending ? (
               <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />
             ) : null}
-            Kommentera
+            {t.submitComment}
           </Button>
         </div>
       </div>
@@ -440,7 +446,7 @@ export default function CommentsSection({ postId }: CommentsSectionProps) {
           data-ocid="comments.empty_state"
           className="py-10 text-center text-muted-foreground text-sm"
         >
-          Inga kommentarer ännu. Var den första att kommentera!
+          {t.noComments}
         </div>
       ) : (
         <div className="space-y-3">
@@ -456,6 +462,7 @@ export default function CommentsSection({ postId }: CommentsSectionProps) {
               postId={postId}
               depth={0}
               index={i + 1}
+              t={t}
             />
           ))}
         </div>

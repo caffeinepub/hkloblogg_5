@@ -94,6 +94,8 @@ import {
   useToggleCategoryHidden,
   useUnblockUser,
 } from "../hooks/useQueries";
+import { useLang } from "../locales/LanguageContext";
+import { translations } from "../locales/translations";
 
 interface AdminPanelProps {
   onBack: () => void;
@@ -105,7 +107,11 @@ function formatFileSize(bytes: bigint): string {
   return `${(n / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-function MediaRow({ media, index }: { media: MediaFile; index: number }) {
+function MediaRow({
+  media,
+  index,
+  t,
+}: { media: MediaFile; index: number; t: Record<string, string> }) {
   const { actor } = useActor();
   const queryClient = useQueryClient();
   const [deleting, setDeleting] = useState(false);
@@ -116,9 +122,9 @@ function MediaRow({ media, index }: { media: MediaFile; index: number }) {
     try {
       await actor.deleteMedia(media.id);
       queryClient.invalidateQueries({ queryKey: ["allMedia"] });
-      toast.success("Mediafilen raderades.");
+      toast.success(t.deleted);
     } catch {
-      toast.error("Kunde inte radera mediafilen.");
+      toast.error(t.errorOccurred);
     } finally {
       setDeleting(false);
     }
@@ -131,7 +137,7 @@ function MediaRow({ media, index }: { media: MediaFile; index: number }) {
       </TableCell>
       <TableCell>
         <Badge variant="outline" className="text-xs">
-          {media.fileType === "image" ? "Bild" : "Video"}
+          {media.fileType === "image" ? t.imageType : t.videoType}
         </Badge>
       </TableCell>
       <TableCell className="text-muted-foreground text-sm">
@@ -139,9 +145,9 @@ function MediaRow({ media, index }: { media: MediaFile; index: number }) {
       </TableCell>
       <TableCell className="text-muted-foreground text-sm">
         {media.postId != null
-          ? "Inlägg"
+          ? t.post
           : media.commentId != null
-            ? "Kommentar"
+            ? t.comment
             : "-"}
       </TableCell>
       <TableCell className="text-muted-foreground text-sm">
@@ -168,22 +174,21 @@ function MediaRow({ media, index }: { media: MediaFile; index: number }) {
           </AlertDialogTrigger>
           <AlertDialogContent data-ocid="admin.media.dialog">
             <AlertDialogHeader>
-              <AlertDialogTitle>Radera mediafil</AlertDialogTitle>
+              <AlertDialogTitle>{t.mediaDeleteTitle}</AlertDialogTitle>
               <AlertDialogDescription>
-                Är du säker på att du vill radera &ldquo;{media.fileName}
-                &rdquo;? Detta kan inte ångras.
+                {t.deletePostConfirm} &ldquo;{media.fileName}&rdquo;
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel data-ocid="admin.media.cancel_button">
-                Avbryt
+                {t.cancel}
               </AlertDialogCancel>
               <AlertDialogAction
                 data-ocid="admin.media.confirm_button"
                 onClick={handleDelete}
                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               >
-                Radera
+                {t.confirmDelete}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
@@ -198,11 +203,13 @@ function CategoryRow({
   isHidden,
   index,
   users,
+  t,
 }: {
   category: Category;
   isHidden: boolean;
   index: number;
   users: UserWithPrincipal[];
+  t: Record<string, string>;
 }) {
   const deleteCategory = useDeleteCategory();
   const toggleHidden = useToggleCategoryHidden();
@@ -220,15 +227,12 @@ function CategoryRow({
   const { data: allowedPrincipals } = useGetCategoryAllowedUsers(
     isHidden ? category.id : null,
   );
-  // Initialize schedule form from fetched data
+
   if (scheduleData !== undefined && scheduleData !== null && !schedInit) {
     setSchedEnabled(scheduleData.enabled);
     setSchedWeekday(scheduleData.weekday.toString());
     setSchedHour(scheduleData.hour.toString());
     setSchedInit(true);
-  }
-  if (!showSchedule && schedInit) {
-    // reset when closed
   }
 
   const addToWhitelist = useAddUserToCategoryAllowedList();
@@ -255,11 +259,9 @@ function CategoryRow({
         user: user.principal,
       });
       setUserSearchQuery("");
-      toast.success(
-        `${user.profile.alias} har fått åtkomst till "${category.name}".`,
-      );
+      toast.success(`${user.profile.alias}: ${t.addToWhitelist}`);
     } catch {
-      toast.error("Kunde inte lägga till användaren.");
+      toast.error(t.errorOccurred);
     }
   };
 
@@ -269,20 +271,18 @@ function CategoryRow({
         categoryId: category.id,
         user: user.principal,
       });
-      toast.success(
-        `${user.profile.alias} har tagits bort från "${category.name}".`,
-      );
+      toast.success(`${user.profile.alias}: ${t.removeFromWhitelist}`);
     } catch {
-      toast.error("Kunde inte ta bort användaren.");
+      toast.error(t.errorOccurred);
     }
   };
 
   const handleDelete = async () => {
     try {
       await deleteCategory.mutateAsync(category.id);
-      toast.success(`Kategori "${category.name}" raderad.`);
+      toast.success(`"${category.name}" ${t.deleted}`);
     } catch {
-      toast.error("Kunde inte radera kategorin.");
+      toast.error(t.errorOccurred);
     }
   };
 
@@ -294,11 +294,11 @@ function CategoryRow({
       });
       toast.success(
         isHidden
-          ? `Kategori "${category.name}" är nu synlig.`
-          : `Kategori "${category.name}" är nu dold.`,
+          ? `"${category.name}" ${t.showCategory}`
+          : `"${category.name}" ${t.hideCategory}`,
       );
     } catch {
-      toast.error("Kunde inte ändra synlighet.");
+      toast.error(t.errorOccurred);
     }
   };
 
@@ -310,11 +310,21 @@ function CategoryRow({
         weekday: Number.parseInt(schedWeekday),
         hour: Number.parseInt(schedHour),
       });
-      toast.success(`Schema för "${category.name}" sparat.`);
+      toast.success(t.scheduleSaved);
     } catch {
-      toast.error("Kunde inte spara schema.");
+      toast.error(t.errorOccurred);
     }
   };
+
+  const weekdayLabels = [
+    t.monday,
+    t.tuesday,
+    t.wednesday,
+    t.thursday,
+    t.friday,
+    t.saturday,
+    t.sunday,
+  ];
 
   return (
     <>
@@ -328,7 +338,7 @@ function CategoryRow({
             {isHidden && (
               <Badge variant="secondary" className="text-xs gap-1">
                 <EyeOff className="h-2.5 w-2.5" />
-                Dold
+                {t.hidden}
               </Badge>
             )}
           </div>
@@ -346,7 +356,7 @@ function CategoryRow({
               size="sm"
               onClick={handleToggleHidden}
               disabled={toggleHidden.isPending}
-              title={isHidden ? "Visa kategori" : "Dölj kategori"}
+              title={isHidden ? t.showCategory : t.hideCategory}
               className="text-muted-foreground hover:text-foreground"
             >
               {toggleHidden.isPending ? (
@@ -363,7 +373,7 @@ function CategoryRow({
                 variant={showWhitelist ? "secondary" : "ghost"}
                 size="sm"
                 onClick={() => setShowWhitelist((v) => !v)}
-                title="Hantera åtkomst"
+                title={t.whitelist}
                 className="text-muted-foreground hover:text-foreground"
               >
                 <UserPlus className="h-4 w-4" />
@@ -377,7 +387,7 @@ function CategoryRow({
                 setShowSchedule((v) => !v);
                 setSchedInit(false);
               }}
-              title="Automatisk rensning"
+              title={t.cleanupSchedule}
               className="text-muted-foreground hover:text-foreground"
             >
               <Clock className="h-4 w-4" />
@@ -400,22 +410,21 @@ function CategoryRow({
               </AlertDialogTrigger>
               <AlertDialogContent data-ocid="admin.categories.dialog">
                 <AlertDialogHeader>
-                  <AlertDialogTitle>Radera kategori</AlertDialogTitle>
+                  <AlertDialogTitle>{t.deletePostTitle}</AlertDialogTitle>
                   <AlertDialogDescription>
-                    Är du säker på att du vill radera kategorin &ldquo;
-                    {category.name}&rdquo;? Detta kan inte ångras.
+                    {t.deletePostConfirm} &ldquo;{category.name}&rdquo;
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel data-ocid="admin.categories.cancel_button">
-                    Avbryt
+                    {t.cancel}
                   </AlertDialogCancel>
                   <AlertDialogAction
                     data-ocid="admin.categories.confirm_button"
                     onClick={handleDelete}
                     className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                   >
-                    Radera
+                    {t.confirmDelete}
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
@@ -428,7 +437,7 @@ function CategoryRow({
           <TableCell colSpan={3} className="py-4 px-6 bg-muted/30">
             <div className="space-y-4 max-w-sm">
               <p className="text-xs font-medium text-foreground">
-                Automatisk rensning för &ldquo;{category.name}&rdquo;
+                {t.cleanupFor} &ldquo;{category.name}&rdquo;
               </p>
               <div className="flex items-center gap-3">
                 <Switch
@@ -440,13 +449,13 @@ function CategoryRow({
                   htmlFor={`sched-enabled-${category.id}`}
                   className="text-sm"
                 >
-                  Aktivera automatisk rensning
+                  {t.enableCleanup}
                 </Label>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <Label className="text-xs text-muted-foreground">
-                    Veckodag
+                    {t.weekday}
                   </Label>
                   <Select value={schedWeekday} onValueChange={setSchedWeekday}>
                     <SelectTrigger
@@ -456,19 +465,17 @@ function CategoryRow({
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="0">Måndag</SelectItem>
-                      <SelectItem value="1">Tisdag</SelectItem>
-                      <SelectItem value="2">Onsdag</SelectItem>
-                      <SelectItem value="3">Torsdag</SelectItem>
-                      <SelectItem value="4">Fredag</SelectItem>
-                      <SelectItem value="5">Lördag</SelectItem>
-                      <SelectItem value="6">Söndag</SelectItem>
+                      {weekdayLabels.map((label, i) => (
+                        <SelectItem key={i.toString()} value={i.toString()}>
+                          {label}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs text-muted-foreground">
-                    Klockslag (UTC)
+                    {t.time}
                   </Label>
                   <Select value={schedHour} onValueChange={setSchedHour}>
                     <SelectTrigger
@@ -489,16 +496,13 @@ function CategoryRow({
               </div>
               {scheduleData?.lastRunAt != null && (
                 <p className="text-xs text-muted-foreground">
-                  Senast körde:{" "}
+                  {t.lastRun}{" "}
                   {new Date(
                     Number(scheduleData.lastRunAt) / 1_000_000,
                   ).toLocaleString("sv-SE")}
                 </p>
               )}
-              <p className="text-xs text-destructive/80">
-                OBS: Alla inlägg, kommentarer och mediafiler i kategorin raderas
-                permanent.
-              </p>
+              <p className="text-xs text-destructive/80">{t.cleanupWarning}</p>
               <Button
                 data-ocid={`admin.categories.schedule.save_button.${index}`}
                 size="sm"
@@ -511,7 +515,7 @@ function CategoryRow({
                 ) : (
                   <Clock className="h-3.5 w-3.5" />
                 )}
-                Spara schema
+                {t.saveSchedule}
               </Button>
             </div>
           </TableCell>
@@ -522,11 +526,11 @@ function CategoryRow({
           <TableCell colSpan={3} className="py-3 px-6 bg-muted/30">
             <div className="space-y-3">
               <p className="text-xs font-medium text-foreground">
-                Åtkomst till &ldquo;{category.name}&rdquo;
+                {t.whitelist}: &ldquo;{category.name}&rdquo;
               </p>
               {allowedUsers.length === 0 ? (
                 <p className="text-xs text-muted-foreground">
-                  Inga användare har åtkomst till denna dolda kategori.
+                  {t.noWhitelistUsers}
                 </p>
               ) : (
                 <div className="flex flex-wrap gap-1.5">
@@ -541,7 +545,7 @@ function CategoryRow({
                         onClick={() => handleRemoveFromWhitelist(u)}
                         disabled={removeFromWhitelist.isPending}
                         className="text-muted-foreground hover:text-destructive transition-colors ml-0.5"
-                        title="Ta bort åtkomst"
+                        title={t.removeFromWhitelist}
                       >
                         <X className="h-3 w-3" />
                       </button>
@@ -555,7 +559,7 @@ function CategoryRow({
                   <Input
                     value={userSearchQuery}
                     onChange={(e) => setUserSearchQuery(e.target.value)}
-                    placeholder="Sök alias för att lägga till…"
+                    placeholder={t.searchAlias}
                     className="pl-7 h-7 text-xs"
                   />
                 </div>
@@ -578,7 +582,7 @@ function CategoryRow({
               )}
               {userSearchQuery && filteredAvailable.length === 0 && (
                 <p className="text-xs text-muted-foreground">
-                  Ingen användare matchar sökningen.
+                  {t.noMatchingUsers}
                 </p>
               )}
             </div>
@@ -594,11 +598,13 @@ function UserRow({
   index,
   moderatorPrincipals,
   isSuperAdmin,
+  t,
 }: {
   user: UserWithPrincipal;
   index: number;
   moderatorPrincipals: string[];
   isSuperAdmin: boolean;
+  t: Record<string, string>;
 }) {
   const isAdmin = user.profile.role === UserRole.admin;
   const isModerator = moderatorPrincipals.includes(user.principal.toString());
@@ -613,13 +619,13 @@ function UserRow({
     try {
       if (user.profile.blocked) {
         await unblockUser.mutateAsync(user.principal);
-        toast.success(`${user.profile.alias} avblockerades.`);
+        toast.success(`${user.profile.alias}: ${t.unblockUser}`);
       } else {
         await blockUser.mutateAsync(user.principal);
-        toast.success(`${user.profile.alias} blockerades.`);
+        toast.success(`${user.profile.alias}: ${t.blockUser}`);
       }
     } catch {
-      toast.error("Kunde inte ändra blockeringsstatus.");
+      toast.error(t.errorOccurred);
     }
   };
 
@@ -629,20 +635,20 @@ function UserRow({
       await setRole.mutateAsync({ principal: user.principal, role: newRole });
       toast.success(
         isAdmin
-          ? `${user.profile.alias} är inte längre admin.`
-          : `${user.profile.alias} är nu admin.`,
+          ? `${user.profile.alias}: ${t.removeAdmin}`
+          : `${user.profile.alias}: ${t.makeAdmin}`,
       );
     } catch {
-      toast.error("Kunde inte ändra roll.");
+      toast.error(t.errorOccurred);
     }
   };
 
   const handleDelete = async () => {
     try {
       await deleteUser.mutateAsync(user.principal);
-      toast.success(`Användaren ${user.profile.alias} raderades.`);
+      toast.success(`${user.profile.alias}: ${t.deleted}`);
     } catch {
-      toast.error("Kunde inte radera användaren.");
+      toast.error(t.errorOccurred);
     }
   };
 
@@ -650,13 +656,13 @@ function UserRow({
     try {
       if (isModerator) {
         await revokeModerator.mutateAsync(user.principal);
-        toast.success(`${user.profile.alias} är inte längre moderator.`);
+        toast.success(`${user.profile.alias}: ${t.revokeModerator}`);
       } else {
         await assignModerator.mutateAsync(user.principal);
-        toast.success(`${user.profile.alias} är nu moderator.`);
+        toast.success(`${user.profile.alias}: ${t.assignModerator}`);
       }
     } catch {
-      toast.error("Kunde inte ändra moderatorstatus.");
+      toast.error(t.errorOccurred);
     }
   };
 
@@ -680,11 +686,11 @@ function UserRow({
             variant={isAdmin ? "default" : "secondary"}
             className="text-xs"
           >
-            {isAdmin ? "Admin" : "Användare"}
+            {isAdmin ? t.admin : t.user}
           </Badge>
           {isModerator && (
             <Badge className="text-xs bg-amber-100 text-amber-800 border border-amber-200 hover:bg-amber-100">
-              Moderator
+              {t.moderator}
             </Badge>
           )}
         </div>
@@ -692,11 +698,11 @@ function UserRow({
       <TableCell>
         {user.profile.blocked ? (
           <Badge variant="destructive" className="text-xs">
-            Blockerad
+            {t.blocked}
           </Badge>
         ) : (
           <Badge variant="outline" className="text-xs text-muted-foreground">
-            Aktiv
+            {t.active}
           </Badge>
         )}
       </TableCell>
@@ -710,7 +716,7 @@ function UserRow({
             disabled={isActing}
             className="text-muted-foreground hover:text-foreground text-xs"
           >
-            {user.profile.blocked ? "Avblockera" : "Blockera"}
+            {user.profile.blocked ? t.unblockUser : t.blockUser}
           </Button>
           {isSuperAdmin && !isAdmin && (
             <Button
@@ -719,7 +725,7 @@ function UserRow({
               size="sm"
               onClick={handleModeratorToggle}
               disabled={isActing}
-              title={isModerator ? "Ta bort moderator" : "Gör moderator"}
+              title={isModerator ? t.revokeModerator : t.assignModerator}
               className={
                 isModerator
                   ? "text-amber-600 hover:text-amber-700 text-xs"
@@ -737,7 +743,7 @@ function UserRow({
             disabled={isActing}
             className="text-muted-foreground hover:text-foreground text-xs"
           >
-            {isAdmin ? "Ta bort admin" : "Gör admin"}
+            {isAdmin ? t.removeAdmin : t.makeAdmin}
           </Button>
           <AlertDialog>
             <AlertDialogTrigger asChild>
@@ -757,23 +763,21 @@ function UserRow({
             </AlertDialogTrigger>
             <AlertDialogContent data-ocid="admin.users.dialog">
               <AlertDialogHeader>
-                <AlertDialogTitle>Radera användare</AlertDialogTitle>
+                <AlertDialogTitle>{t.deleteUser}</AlertDialogTitle>
                 <AlertDialogDescription>
-                  Är du säker på att du vill radera {user.profile.alias}? Alla
-                  deras inlägg och kommentarer raderas permanent. Detta kan inte
-                  ångras.
+                  {t.deleteUserConfirm.replace("{alias}", user.profile.alias)}
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
                 <AlertDialogCancel data-ocid="admin.users.cancel_button">
-                  Avbryt
+                  {t.cancel}
                 </AlertDialogCancel>
                 <AlertDialogAction
                   data-ocid="admin.users.confirm_button"
                   onClick={handleDelete}
                   className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                 >
-                  Radera
+                  {t.confirmDelete}
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
@@ -788,25 +792,26 @@ function AdminPostRow({
   post,
   index,
   catName,
-}: { post: Post; index: number; catName: string }) {
+  t,
+}: { post: Post; index: number; catName: string; t: Record<string, string> }) {
   const deletePost = useDeletePost();
   const pinPost = usePinPost();
 
   const handleDelete = async () => {
     try {
       await deletePost.mutateAsync(post.id);
-      toast.success("Inlägget raderades.");
+      toast.success(t.deleted);
     } catch {
-      toast.error("Kunde inte radera inlägget.");
+      toast.error(t.errorOccurred);
     }
   };
 
   const handlePin = async () => {
     try {
       await pinPost.mutateAsync({ postId: post.id, pinned: !post.pinned });
-      toast.success(post.pinned ? "Inlägg lossades." : "Inlägg fastnålades.");
+      toast.success(post.pinned ? t.unpinPost : t.pinPost);
     } catch {
-      toast.error("Kunde inte ändra fastnålning.");
+      toast.error(t.errorOccurred);
     }
   };
 
@@ -857,22 +862,21 @@ function AdminPostRow({
             </AlertDialogTrigger>
             <AlertDialogContent data-ocid="admin.posts.dialog">
               <AlertDialogHeader>
-                <AlertDialogTitle>Radera inlägg</AlertDialogTitle>
+                <AlertDialogTitle>{t.deletePostTitle}</AlertDialogTitle>
                 <AlertDialogDescription>
-                  Är du säker på att du vill radera &ldquo;{post.title}&rdquo;?
-                  Detta kan inte ångras.
+                  {t.deletePostConfirm} &ldquo;{post.title}&rdquo;
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
                 <AlertDialogCancel data-ocid="admin.posts.cancel_button">
-                  Avbryt
+                  {t.cancel}
                 </AlertDialogCancel>
                 <AlertDialogAction
                   data-ocid="admin.posts.confirm_button"
                   onClick={handleDelete}
                   className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                 >
-                  Radera
+                  {t.confirmDelete}
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
@@ -896,6 +900,8 @@ function useAllComments() {
 }
 
 export default function AdminPanel({ onBack }: AdminPanelProps) {
+  const { lang } = useLang();
+  const t = translations[lang];
   const { data: categories, isLoading: loadingCats } = useListCategories();
   const { data: cleanupLogs } = useListCleanupLogs(null);
   const { data: hiddenCategoryIds } = useGetHiddenCategoryIds();
@@ -909,7 +915,6 @@ export default function AdminPanel({ onBack }: AdminPanelProps) {
   const [newCatName, setNewCatName] = useState("");
   const [catError, setCatError] = useState("");
 
-  // Search state per tab
   const [catSearch, setCatSearch] = useState("");
   const [userSearch, setUserSearch] = useState("");
   const [postSearch, setPostSearch] = useState("");
@@ -917,11 +922,6 @@ export default function AdminPanel({ onBack }: AdminPanelProps) {
 
   const hiddenIdsSet = new Set(hiddenCategoryIds ?? []);
   const moderatorPrincipals = (moderatorList ?? []).map((p) => p.toString());
-  // isSuperAdmin: the admin panel is only accessible to admins; we check if caller is NOT a moderator but IS admin
-  // We'll determine superAdmin by checking myProfile role via actor directly -- use isCallerAdmin state
-  // For simplicity: anyone who can access AdminPanel is admin; isSuperAdmin means they can also manage moderators
-  // The backend assignModerator is restricted to superadmin, so we show the button for all admins
-  // but let backend enforce the actual restriction. We show it when caller is admin (isCallerAdmin).
   const isSuperAdmin = isCallerAdmin !== false;
 
   const { data: allMedia, isLoading: loadingMedia } = useQuery<MediaFile[]>({
@@ -948,7 +948,6 @@ export default function AdminPanel({ onBack }: AdminPanelProps) {
 
   const catMap = new Map((categories ?? []).map((c) => [c.id, c.name]));
 
-  // Filtered lists
   const filteredCategories = (categories ?? []).filter((c) =>
     c.name.toLowerCase().includes(catSearch.toLowerCase()),
   );
@@ -975,16 +974,16 @@ export default function AdminPanel({ onBack }: AdminPanelProps) {
     e.preventDefault();
     const name = newCatName.trim();
     if (!name) {
-      setCatError("Ange ett kategorinamn.");
+      setCatError(t.categoryNameRequired);
       return;
     }
     setCatError("");
     try {
       await createCategory.mutateAsync(name);
       setNewCatName("");
-      toast.success(`Kategori "${name}" skapad.`);
+      toast.success(`"${name}" ${t.saved}`);
     } catch {
-      toast.error("Kunde inte skapa kategorin.");
+      toast.error(t.errorOccurred);
     }
   };
 
@@ -1002,17 +1001,17 @@ export default function AdminPanel({ onBack }: AdminPanelProps) {
             className="text-muted-foreground -ml-2"
           >
             <ArrowLeft className="w-4 h-4 mr-1" />
-            Tillbaka
+            {t.back}
           </Button>
           <Separator orientation="vertical" className="h-5" />
           <div className="flex items-center gap-2">
             <BookOpen className="w-5 h-5 text-primary" strokeWidth={1.5} />
             <span className="font-display text-xl text-foreground">
-              HKLOblogg
+              {t.blogTitle}
             </span>
           </div>
           <Badge className="ml-auto gap-1">
-            <Shield className="h-3 w-3" /> Adminpanel
+            <Shield className="h-3 w-3" /> {t.adminPanelTitle}
           </Badge>
         </div>
       </header>
@@ -1024,7 +1023,7 @@ export default function AdminPanel({ onBack }: AdminPanelProps) {
           transition={{ duration: 0.4 }}
         >
           <h1 className="font-display text-3xl text-foreground mb-6">
-            Adminpanel
+            {t.adminPanelTitle}
           </h1>
 
           <Tabs defaultValue="categories" className="space-y-6">
@@ -1035,7 +1034,7 @@ export default function AdminPanel({ onBack }: AdminPanelProps) {
                 className="gap-1.5"
               >
                 <Images className="w-3.5 h-3.5" />
-                Media
+                {t.mediaTab}
               </TabsTrigger>
               <TabsTrigger
                 data-ocid="admin.categories.tab"
@@ -1043,7 +1042,7 @@ export default function AdminPanel({ onBack }: AdminPanelProps) {
                 className="gap-1.5"
               >
                 <Tag className="w-3.5 h-3.5" />
-                Kategorier
+                {t.categoriesTab}
               </TabsTrigger>
               <TabsTrigger
                 data-ocid="admin.users.tab"
@@ -1051,7 +1050,7 @@ export default function AdminPanel({ onBack }: AdminPanelProps) {
                 className="gap-1.5"
               >
                 <Users className="w-3.5 h-3.5" />
-                Användare
+                {t.usersTab}
               </TabsTrigger>
               <TabsTrigger
                 data-ocid="admin.posts.tab"
@@ -1059,7 +1058,7 @@ export default function AdminPanel({ onBack }: AdminPanelProps) {
                 className="gap-1.5"
               >
                 <FileText className="w-3.5 h-3.5" />
-                Inlägg
+                {t.postsTab}
               </TabsTrigger>
               <TabsTrigger
                 data-ocid="admin.comments.tab"
@@ -1067,7 +1066,7 @@ export default function AdminPanel({ onBack }: AdminPanelProps) {
                 className="gap-1.5"
               >
                 <MessageCircle className="w-3.5 h-3.5" />
-                Kommentarer
+                {t.commentsTab}
               </TabsTrigger>
             </TabsList>
 
@@ -1075,7 +1074,7 @@ export default function AdminPanel({ onBack }: AdminPanelProps) {
             <TabsContent value="categories" className="space-y-6">
               <div className="bg-card border border-border rounded-xl p-6 shadow-card">
                 <h2 className="font-semibold text-foreground mb-4">
-                  Ny kategori
+                  {t.createCategory}
                 </h2>
                 <form
                   onSubmit={handleCreateCategory}
@@ -1086,7 +1085,7 @@ export default function AdminPanel({ onBack }: AdminPanelProps) {
                       data-ocid="admin.categories.input"
                       value={newCatName}
                       onChange={(e) => setNewCatName(e.target.value)}
-                      placeholder="Kategorinamn"
+                      placeholder={t.categoryNamePlaceholder}
                       maxLength={50}
                       className="h-9"
                     />
@@ -1111,7 +1110,7 @@ export default function AdminPanel({ onBack }: AdminPanelProps) {
                     ) : (
                       <Plus className="h-4 w-4" />
                     )}
-                    Lägg till
+                    {t.addCategory}
                   </Button>
                 </form>
               </div>
@@ -1119,7 +1118,7 @@ export default function AdminPanel({ onBack }: AdminPanelProps) {
               <div className="bg-card border border-border rounded-xl overflow-hidden shadow-card">
                 <div className="px-6 py-4 border-b border-border space-y-3">
                   <h2 className="font-semibold text-foreground">
-                    Kategorier
+                    {t.categoriesTab}
                     {categories && (
                       <span className="ml-2 text-muted-foreground font-normal text-sm">
                         ({filteredCategories.length})
@@ -1132,7 +1131,7 @@ export default function AdminPanel({ onBack }: AdminPanelProps) {
                       data-ocid="admin.categories.search_input"
                       value={catSearch}
                       onChange={(e) => setCatSearch(e.target.value)}
-                      placeholder="Sök kategorier…"
+                      placeholder={t.searchCategories}
                       className="pl-8 h-8 text-sm"
                     />
                   </div>
@@ -1149,17 +1148,17 @@ export default function AdminPanel({ onBack }: AdminPanelProps) {
                     data-ocid="admin.categories.empty_state"
                     className="py-12 text-center text-muted-foreground text-sm"
                   >
-                    {catSearch
-                      ? "Inga kategorier matchar sökningen."
-                      : "Inga kategorier ännu. Skapa den första ovan."}
+                    {catSearch ? t.noResults : t.noLogs}
                   </div>
                 ) : (
                   <Table data-ocid="admin.categories.table">
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Namn</TableHead>
-                        <TableHead>Skapad</TableHead>
-                        <TableHead className="text-right">Åtgärder</TableHead>
+                        <TableHead>{t.name}</TableHead>
+                        <TableHead>{t.catCreated}</TableHead>
+                        <TableHead className="text-right">
+                          {t.actions}
+                        </TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -1170,6 +1169,7 @@ export default function AdminPanel({ onBack }: AdminPanelProps) {
                           isHidden={hiddenIdsSet.has(cat.id)}
                           index={i + 1}
                           users={users ?? []}
+                          t={t}
                         />
                       ))}
                     </TableBody>
@@ -1185,7 +1185,7 @@ export default function AdminPanel({ onBack }: AdminPanelProps) {
                 <div className="px-6 py-4 border-b border-border">
                   <h2 className="font-semibold text-foreground flex items-center gap-2">
                     <Clock className="h-4 w-4 text-muted-foreground" />
-                    Rensningslogg
+                    {t.cleanupLogs}
                   </h2>
                 </div>
                 {!cleanupLogs || cleanupLogs.length === 0 ? (
@@ -1193,19 +1193,23 @@ export default function AdminPanel({ onBack }: AdminPanelProps) {
                     data-ocid="admin.cleanup_log.empty_state"
                     className="py-8 text-center text-muted-foreground text-sm"
                   >
-                    Ingen automatisk rensning har körts ännu.
+                    {t.noLogs}
                   </div>
                 ) : (
                   <Table data-ocid="admin.cleanup_log.table">
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Kategori</TableHead>
-                        <TableHead>Datum &amp; tid</TableHead>
-                        <TableHead className="text-right">Inlägg</TableHead>
+                        <TableHead>{t.category}</TableHead>
+                        <TableHead>{t.date}</TableHead>
                         <TableHead className="text-right">
-                          Kommentarer
+                          {t.postsTab}
                         </TableHead>
-                        <TableHead className="text-right">Mediafiler</TableHead>
+                        <TableHead className="text-right">
+                          {t.commentsTab}
+                        </TableHead>
+                        <TableHead className="text-right">
+                          {t.mediaTab}
+                        </TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -1247,7 +1251,7 @@ export default function AdminPanel({ onBack }: AdminPanelProps) {
               <div className="bg-card border border-border rounded-xl overflow-hidden shadow-card">
                 <div className="px-6 py-4 border-b border-border space-y-3">
                   <h2 className="font-semibold text-foreground">
-                    Registrerade användare
+                    {t.registeredUsers}
                     {users && (
                       <span className="ml-2 text-muted-foreground font-normal text-sm">
                         ({filteredUsers.length})
@@ -1260,7 +1264,7 @@ export default function AdminPanel({ onBack }: AdminPanelProps) {
                       data-ocid="admin.users.search_input"
                       value={userSearch}
                       onChange={(e) => setUserSearch(e.target.value)}
-                      placeholder="Sök användare…"
+                      placeholder={t.searchUsers}
                       className="pl-8 h-8 text-sm"
                     />
                   </div>
@@ -1277,18 +1281,18 @@ export default function AdminPanel({ onBack }: AdminPanelProps) {
                     data-ocid="admin.users.empty_state"
                     className="py-12 text-center text-muted-foreground text-sm"
                   >
-                    {userSearch
-                      ? "Inga användare matchar sökningen."
-                      : "Inga registrerade användare ännu."}
+                    {userSearch ? t.noResults : t.noResults}
                   </div>
                 ) : (
                   <Table data-ocid="admin.users.table">
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Alias</TableHead>
-                        <TableHead>Roll</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead className="text-right">Åtgärder</TableHead>
+                        <TableHead>{t.alias}</TableHead>
+                        <TableHead>{t.role}</TableHead>
+                        <TableHead>{t.status}</TableHead>
+                        <TableHead className="text-right">
+                          {t.actions}
+                        </TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -1299,6 +1303,7 @@ export default function AdminPanel({ onBack }: AdminPanelProps) {
                           index={i + 1}
                           moderatorPrincipals={moderatorPrincipals}
                           isSuperAdmin={isSuperAdmin}
+                          t={t}
                         />
                       ))}
                     </TableBody>
@@ -1312,7 +1317,7 @@ export default function AdminPanel({ onBack }: AdminPanelProps) {
               <div className="bg-card border border-border rounded-xl overflow-hidden shadow-card">
                 <div className="px-6 py-4 border-b border-border space-y-3">
                   <h2 className="font-semibold text-foreground">
-                    Alla inlägg
+                    {t.allPosts2}
                     {posts && (
                       <span className="ml-2 text-muted-foreground font-normal text-sm">
                         ({filteredPosts.length})
@@ -1325,7 +1330,7 @@ export default function AdminPanel({ onBack }: AdminPanelProps) {
                       data-ocid="admin.posts.search_input"
                       value={postSearch}
                       onChange={(e) => setPostSearch(e.target.value)}
-                      placeholder="Sök titel, innehåll, alias, datum…"
+                      placeholder={t.searchPosts}
                       className="pl-8 h-8 text-sm"
                     />
                   </div>
@@ -1342,20 +1347,20 @@ export default function AdminPanel({ onBack }: AdminPanelProps) {
                     data-ocid="admin.posts.empty_state"
                     className="py-12 text-center text-muted-foreground text-sm"
                   >
-                    {postSearch
-                      ? "Inga inlägg matchar sökningen."
-                      : "Inga inlägg ännu."}
+                    {postSearch ? t.noResults : t.noResults}
                   </div>
                 ) : (
                   <div className="overflow-x-auto">
                     <Table data-ocid="admin.posts.table">
                       <TableHeader>
                         <TableRow>
-                          <TableHead>Titel</TableHead>
-                          <TableHead>Författare</TableHead>
-                          <TableHead>Kategori</TableHead>
-                          <TableHead>Datum</TableHead>
-                          <TableHead className="text-right">Åtgärder</TableHead>
+                          <TableHead>{t.titleLabel}</TableHead>
+                          <TableHead>{t.author}</TableHead>
+                          <TableHead>{t.category}</TableHead>
+                          <TableHead>{t.date}</TableHead>
+                          <TableHead className="text-right">
+                            {t.actions}
+                          </TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -1364,7 +1369,10 @@ export default function AdminPanel({ onBack }: AdminPanelProps) {
                             key={post.id}
                             post={post}
                             index={i + 1}
-                            catName={catMap.get(post.categoryId) ?? "Okänd"}
+                            catName={
+                              catMap.get(post.categoryId) ?? t.unknownCategory
+                            }
+                            t={t}
                           />
                         ))}
                       </TableBody>
@@ -1379,26 +1387,13 @@ export default function AdminPanel({ onBack }: AdminPanelProps) {
               <div className="bg-card border border-border rounded-xl overflow-hidden shadow-card">
                 <div className="px-6 py-4 border-b border-border space-y-3">
                   <h2 className="font-semibold text-foreground">
-                    Alla kommentarer
+                    {t.allComments}
                     {allComments && (
                       <span className="ml-2 text-muted-foreground font-normal text-sm">
                         ({allComments.length})
                       </span>
                     )}
                   </h2>
-                  <p className="text-xs text-muted-foreground">
-                    Kommentarer hanteras per inlägg. Gå till ett inlägg för att
-                    se och radera kommentarer direkt.
-                  </p>
-                  <div className="relative">
-                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-                    <Input
-                      data-ocid="admin.comments.search_input"
-                      disabled
-                      placeholder="Kommentarer hanteras per inlägg"
-                      className="pl-8 h-8 text-sm opacity-50 cursor-not-allowed"
-                    />
-                  </div>
                 </div>
                 {loadingComments ? (
                   <div
@@ -1412,18 +1407,18 @@ export default function AdminPanel({ onBack }: AdminPanelProps) {
                     data-ocid="admin.comments.empty_state"
                     className="py-12 text-center text-muted-foreground text-sm"
                   >
-                    Kommentarer visas per inlägg. Besök ett inlägg för att
-                    hantera dess kommentarer.
+                    {t.noResults}
                   </div>
                 )}
               </div>
             </TabsContent>
+
             {/* ---- MEDIA ---- */}
             <TabsContent value="media" className="space-y-4">
               <div className="bg-card border border-border rounded-xl overflow-hidden shadow-card">
                 <div className="px-6 py-4 border-b border-border space-y-3">
                   <h2 className="font-semibold text-foreground">
-                    Alla mediafiler
+                    {t.allMediaFiles}
                     {allMedia && (
                       <span className="ml-2 text-muted-foreground font-normal text-sm">
                         ({allMedia.length})
@@ -1436,7 +1431,7 @@ export default function AdminPanel({ onBack }: AdminPanelProps) {
                       data-ocid="admin.media.search_input"
                       value={mediaSearch}
                       onChange={(e) => setMediaSearch(e.target.value)}
-                      placeholder="Sök filnamn, typ, datum…"
+                      placeholder={t.searchMedia}
                       className="pl-8 h-8 text-sm"
                     />
                   </div>
@@ -1453,21 +1448,21 @@ export default function AdminPanel({ onBack }: AdminPanelProps) {
                     data-ocid="admin.media.empty_state"
                     className="py-12 text-center text-muted-foreground text-sm"
                   >
-                    {mediaSearch
-                      ? "Inga mediafiler matchar sökningen."
-                      : "Inga mediafiler uppladdade ännu."}
+                    {mediaSearch ? t.noResults : t.noResults}
                   </div>
                 ) : (
                   <div className="overflow-x-auto">
                     <Table data-ocid="admin.media.table">
                       <TableHeader>
                         <TableRow>
-                          <TableHead>Filnamn</TableHead>
-                          <TableHead>Typ</TableHead>
-                          <TableHead>Storlek</TableHead>
-                          <TableHead>Inlägg/Kommentar</TableHead>
-                          <TableHead>Uppladdad</TableHead>
-                          <TableHead className="text-right">Åtgärder</TableHead>
+                          <TableHead>{t.mediaFile}</TableHead>
+                          <TableHead>{t.mediaType}</TableHead>
+                          <TableHead>{t.mediaSize}</TableHead>
+                          <TableHead>{t.postOrComment}</TableHead>
+                          <TableHead>{t.mediaUploaded}</TableHead>
+                          <TableHead className="text-right">
+                            {t.actions}
+                          </TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -1476,6 +1471,7 @@ export default function AdminPanel({ onBack }: AdminPanelProps) {
                             key={media.id.toString()}
                             media={media}
                             index={i + 1}
+                            t={t}
                           />
                         ))}
                       </TableBody>
@@ -1496,7 +1492,7 @@ export default function AdminPanel({ onBack }: AdminPanelProps) {
           rel="noopener noreferrer"
           className="hover:text-foreground transition-colors"
         >
-          Byggd med ❤ via caffeine.ai
+          {t.footerBuilt}
         </a>
       </footer>
     </div>
