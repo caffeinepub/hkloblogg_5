@@ -1,5 +1,12 @@
 import { Home, Menu, PenLine, Rss } from "lucide-react";
 
+interface SubNavTranslations {
+  home: string;
+  myFeed: string;
+  newPost: string;
+  categories: string;
+}
+
 interface SubNavBarProps {
   hasProfile: boolean;
   activeCategoryName: string;
@@ -8,7 +15,15 @@ interface SubNavBarProps {
   onCreatePost: () => void;
   onOpenCategories: () => void;
   showMyFeed: boolean;
+  t?: SubNavTranslations;
 }
+
+const defaultT: SubNavTranslations = {
+  home: "Hem",
+  myFeed: "Mitt flöde",
+  newPost: "Nytt inlägg",
+  categories: "Kategorier",
+};
 
 export default function SubNavBar({
   hasProfile,
@@ -18,6 +33,7 @@ export default function SubNavBar({
   onCreatePost,
   onOpenCategories,
   showMyFeed,
+  t = defaultT,
 }: SubNavBarProps) {
   return (
     <div className="border-b border-border bg-card/80 backdrop-blur-sm sticky top-[65px] z-10">
@@ -31,7 +47,7 @@ export default function SubNavBar({
             className="flex items-center gap-1.5 px-3 h-8 rounded-md text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring touch-manipulation"
           >
             <Home className="w-3.5 h-3.5 shrink-0" />
-            <span className="hidden xs:inline">Hem</span>
+            <span className="hidden xs:inline">{t.home}</span>
           </button>
 
           {showMyFeed && (
@@ -42,7 +58,7 @@ export default function SubNavBar({
               className="flex items-center gap-1.5 px-3 h-8 rounded-md text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring touch-manipulation"
             >
               <Rss className="w-3.5 h-3.5 shrink-0" />
-              <span className="hidden sm:inline">Mitt flöde</span>
+              <span className="hidden sm:inline">{t.myFeed}</span>
             </button>
           )}
 
@@ -54,7 +70,7 @@ export default function SubNavBar({
               className="flex items-center gap-1.5 px-3 h-8 rounded-md text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring touch-manipulation"
             >
               <PenLine className="w-3.5 h-3.5 shrink-0" />
-              <span className="hidden sm:inline">Nytt inlägg</span>
+              <span className="hidden sm:inline">{t.newPost}</span>
             </button>
           )}
         </div>
@@ -71,12 +87,12 @@ export default function SubNavBar({
             type="button"
             data-ocid="subnav.categories.open_modal_button"
             onClick={onOpenCategories}
-            aria-label="Öppna kategorier"
+            aria-label={t.categories}
             className="flex items-center gap-1.5 px-3 h-8 rounded-md text-sm font-medium text-foreground hover:bg-muted transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring touch-manipulation border border-border"
           >
             <Menu className="w-4 h-4 shrink-0" />
             <span className="hidden md:inline text-muted-foreground">
-              Kategorier
+              {t.categories}
             </span>
           </button>
         </div>

@@ -15,27 +15,64 @@ import {
   useMarkNotificationRead,
 } from "../hooks/useQueries";
 
-function eventLabel(event: NotificationEvent): string {
-  if ("NewComment" in event) return "Ny kommentar";
-  if ("NewReply" in event) return "Nytt svar";
-  if ("NewMedia" in event) return "Ny media";
-  return "Ny händelse";
+interface NotificationTranslations {
+  notifications: string;
+  markAllRead: string;
+  noNotifications: string;
+  newComment: string;
+  newReply: string;
+  newMedia: string;
+  newEvent: string;
+  justNow: string;
+  minutesAgo: string;
+  hoursAgo: string;
+  daysAgo: string;
+  postLabel: string;
 }
 
-function timeAgo(createdAt: bigint): string {
+const defaultT: NotificationTranslations = {
+  notifications: "Notiser",
+  markAllRead: "Markera alla som lästa",
+  noNotifications: "Inga notiser ännu",
+  newComment: "Ny kommentar",
+  newReply: "Nytt svar",
+  newMedia: "Ny media",
+  newEvent: "Ny händelse",
+  justNow: "Just nu",
+  minutesAgo: "min sedan",
+  hoursAgo: "tim sedan",
+  daysAgo: "dag sedan",
+  postLabel: "Inlägg:",
+};
+
+function eventLabel(
+  event: NotificationEvent,
+  t: NotificationTranslations,
+): string {
+  if ("NewComment" in event) return t.newComment;
+  if ("NewReply" in event) return t.newReply;
+  if ("NewMedia" in event) return t.newMedia;
+  return t.newEvent;
+}
+
+function timeAgo(createdAt: bigint, t: NotificationTranslations): string {
   const ms = Number(createdAt) / 1_000_000;
   const diffSec = Math.floor((Date.now() - ms) / 1000);
-  if (diffSec < 60) return "Just nu";
-  if (diffSec < 3600) return `${Math.floor(diffSec / 60)} min sedan`;
-  if (diffSec < 86400) return `${Math.floor(diffSec / 3600)} tim sedan`;
-  return `${Math.floor(diffSec / 86400)} dag sedan`;
+  if (diffSec < 60) return t.justNow;
+  if (diffSec < 3600) return `${Math.floor(diffSec / 60)} ${t.minutesAgo}`;
+  if (diffSec < 86400) return `${Math.floor(diffSec / 3600)} ${t.hoursAgo}`;
+  return `${Math.floor(diffSec / 86400)} ${t.daysAgo}`;
 }
 
 interface NotificationBellProps {
   onPost?: (id: string) => void;
+  t?: NotificationTranslations;
 }
 
-export default function NotificationBell({ onPost }: NotificationBellProps) {
+export default function NotificationBell({
+  onPost,
+  t = defaultT,
+}: NotificationBellProps) {
   const [open, setOpen] = useState(false);
   const { data: unreadCount } = useGetUnreadNotificationCount();
   const { data: notifications } = useGetMyNotifications();
@@ -68,7 +105,7 @@ export default function NotificationBell({ onPost }: NotificationBellProps) {
           variant="ghost"
           size="sm"
           className="relative text-muted-foreground hover:text-foreground"
-          aria-label="Notiser"
+          aria-label={t.notifications}
         >
           <Bell className="w-4 h-4" />
           {unread > 0 && (
@@ -80,7 +117,7 @@ export default function NotificationBell({ onPost }: NotificationBellProps) {
       </PopoverTrigger>
       <PopoverContent align="end" className="w-80 p-0 shadow-lg">
         <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-          <span className="font-medium text-sm">Notiser</span>
+          <span className="font-medium text-sm">{t.notifications}</span>
           {unread > 0 && (
             <Button
               variant="ghost"
@@ -89,14 +126,14 @@ export default function NotificationBell({ onPost }: NotificationBellProps) {
               onClick={handleMarkAll}
               disabled={markAllRead.isPending}
             >
-              Markera alla som lästa
+              {t.markAllRead}
             </Button>
           )}
         </div>
         <div className="max-h-80 overflow-y-auto">
           {recent.length === 0 ? (
             <div className="py-8 text-center text-sm text-muted-foreground">
-              Inga notiser ännu
+              {t.noNotifications}
             </div>
           ) : (
             recent.map((notif) => (
@@ -113,15 +150,15 @@ export default function NotificationBell({ onPost }: NotificationBellProps) {
                         <span className="w-2 h-2 rounded-full bg-blue-500 shrink-0" />
                       )}
                       <span className="text-xs font-medium text-foreground">
-                        {eventLabel(notif.event)}
+                        {eventLabel(notif.event, t)}
                       </span>
                     </div>
                     <p className="text-xs text-muted-foreground truncate">
-                      Inlägg: {notif.postId}
+                      {t.postLabel} {notif.postId}
                     </p>
                   </div>
                   <span className="text-xs text-muted-foreground/70 shrink-0">
-                    {timeAgo(notif.createdAt)}
+                    {timeAgo(notif.createdAt, t)}
                   </span>
                 </div>
               </button>

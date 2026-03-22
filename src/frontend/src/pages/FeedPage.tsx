@@ -33,6 +33,9 @@ import {
   useMyProfile,
 } from "../hooks/useQueries";
 import { readTime } from "../lib/readTime";
+import { useLang } from "../locales/LanguageContext";
+import { LANGUAGES, translations } from "../locales/translations";
+import type { Language } from "../locales/translations";
 
 interface FeedPageProps {
   hasProfile?: boolean;
@@ -64,12 +67,14 @@ function PostCard({
   liked,
   onClick,
   index,
+  pinnedLabel,
 }: {
   post: Post;
   categoryName: string;
   liked: boolean;
   onClick: () => void;
   index: number;
+  pinnedLabel: string;
 }) {
   const date = new Date(Number(post.createdAt) / 1_000_000);
 
@@ -90,7 +95,7 @@ function PostCard({
               className="text-xs gap-1 bg-primary/10 text-primary border-primary/20"
             >
               <Pin className="w-3 h-3" />
-              Fastnålad
+              {pinnedLabel}
             </Badge>
           )}
           <Badge variant="outline" className="text-xs text-muted-foreground">
@@ -150,6 +155,8 @@ export default function FeedPage({
   const { data: likedPosts } = useMyLikedPosts();
   const [searchInput, setSearchInput] = useState("");
   const [sheetOpen, setSheetOpen] = useState(false);
+  const { lang, setLang } = useLang();
+  const t = translations[lang];
 
   const likedSet = new Set(likedPosts ?? []);
 
@@ -162,8 +169,8 @@ export default function FeedPage({
   const catMap = new Map((categories ?? []).map((c) => [c.id, c.name]));
 
   const activeCategoryName = activeCatId
-    ? (catMap.get(activeCatId) ?? "Alla")
-    : "Alla";
+    ? (catMap.get(activeCatId) ?? t.allPosts)
+    : t.allPosts;
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -172,6 +179,21 @@ export default function FeedPage({
   };
 
   const showProfileBanner = !!identity && !hasProfile;
+
+  const notifT = {
+    notifications: t.notifications,
+    markAllRead: t.markAllRead,
+    noNotifications: t.noNotifications,
+    newComment: t.newComment,
+    newReply: t.newReply,
+    newMedia: t.newMedia,
+    newEvent: t.newEvent,
+    justNow: t.justNow,
+    minutesAgo: t.minutesAgo,
+    hoursAgo: t.hoursAgo,
+    daysAgo: t.daysAgo,
+    postLabel: t.postLabel,
+  };
 
   return (
     <div className="min-h-screen leaf-bg-page flex flex-col">
@@ -182,7 +204,7 @@ export default function FeedPage({
           <div className="flex items-center gap-2">
             <BookOpen className="w-5 h-5 text-primary" strokeWidth={1.5} />
             <span className="font-display text-xl text-foreground border-b-2 border-primary pb-0.5">
-              HKLOblogg
+              {t.blogTitle}
             </span>
           </div>
           <div className="flex items-center gap-2">
@@ -197,14 +219,31 @@ export default function FeedPage({
                   data-ocid="feed.search.input"
                   value={searchInput}
                   onChange={(e) => setSearchInput(e.target.value)}
-                  placeholder="Sök inlägg…"
+                  placeholder={t.searchPlaceholder}
                   className="pl-8 h-8 w-40 text-sm"
                 />
               </div>
             </form>
 
+            {/* Language selector */}
+            <select
+              value={lang}
+              onChange={(e) => setLang(e.target.value as Language)}
+              className="text-xs text-muted-foreground bg-transparent border border-border rounded px-1 py-0.5 cursor-pointer hover:text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+              aria-label="Select language"
+              data-ocid="feed.language.select"
+            >
+              {LANGUAGES.map(({ code, flag, label }) => (
+                <option key={code} value={code}>
+                  {flag} {label}
+                </option>
+              ))}
+            </select>
+
             {/* Notification bell */}
-            {identity && hasProfile && <NotificationBell onPost={onPost} />}
+            {identity && hasProfile && (
+              <NotificationBell onPost={onPost} t={notifT} />
+            )}
 
             {/* Profile button – desktop */}
             {profile && (
@@ -226,7 +265,7 @@ export default function FeedPage({
                 className="hidden sm:flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors px-2 py-1 rounded-md hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <User className="w-3.5 h-3.5" />
-                <span>Profil</span>
+                <span>{t.profileLabel}</span>
               </button>
             )}
 
@@ -240,7 +279,7 @@ export default function FeedPage({
                 className="hidden sm:flex gap-1.5 text-primary border-primary/30 hover:bg-primary/5"
               >
                 <Shield className="w-3.5 h-3.5" />
-                <span>Adminpanel</span>
+                <span>{t.adminPanel}</span>
               </Button>
             )}
 
@@ -250,6 +289,7 @@ export default function FeedPage({
               variant="ghost"
               size="sm"
               onClick={clear}
+              aria-label={t.logout}
               className="hidden sm:flex text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
             >
               <LogOut className="w-4 h-4" />
@@ -279,10 +319,7 @@ export default function FeedPage({
           <div className="max-w-3xl mx-auto px-6 py-3 flex items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <Info className="w-4 h-4 text-blue-600 shrink-0" />
-              <p className="text-sm text-blue-800">
-                Välkommen! Ange ditt visningsnamn i din profil för att kunna
-                skriva inlägg och kommentarer.
-              </p>
+              <p className="text-sm text-blue-800">{t.welcomeBanner}</p>
             </div>
             <Button
               data-ocid="feed.profile_banner.button"
@@ -291,7 +328,7 @@ export default function FeedPage({
               onClick={onProfile}
               className="shrink-0 border-blue-300 text-blue-700 hover:bg-blue-100"
             >
-              Gå till profilen
+              {t.goToProfile}
             </Button>
           </div>
         </motion.div>
@@ -306,6 +343,12 @@ export default function FeedPage({
         onCreatePost={hasProfile ? onCreatePost : onProfile}
         onOpenCategories={() => setSheetOpen(true)}
         showMyFeed={!!identity && hasProfile}
+        t={{
+          home: t.home,
+          myFeed: t.myFeed,
+          newPost: t.newPost,
+          categories: t.categories,
+        }}
       />
 
       <main className="flex-1 max-w-3xl mx-auto w-full px-6 py-8">
@@ -331,9 +374,7 @@ export default function FeedPage({
               className="w-10 h-10 text-muted-foreground/40 mx-auto mb-4"
               strokeWidth={1}
             />
-            <p className="text-muted-foreground">
-              Inga inlägg ännu. Var den första att skriva!
-            </p>
+            <p className="text-muted-foreground">{t.noPostsYet}</p>
           </div>
         ) : (
           <div className="space-y-4">
@@ -341,17 +382,18 @@ export default function FeedPage({
               <PostCard
                 key={post.id}
                 post={post}
-                categoryName={catMap.get(post.categoryId) ?? "Okänd kategori"}
+                categoryName={catMap.get(post.categoryId) ?? t.unknownCategory}
                 liked={likedSet.has(post.id)}
                 onClick={() => onPost(post.id)}
                 index={i + 1}
+                pinnedLabel={t.pinned}
               />
             ))}
           </div>
         )}
       </main>
 
-      {/* FAB – Nytt inlägg */}
+      {/* FAB – New post */}
       <button
         type="button"
         data-ocid="feed.create_post.button"
@@ -362,15 +404,10 @@ export default function FeedPage({
             ? "bg-primary text-primary-foreground hover:opacity-90"
             : "bg-muted text-muted-foreground cursor-not-allowed opacity-60"
         }`}
-        aria-label="Skapa nytt inlägg"
-        title={
-          !hasProfile
-            ? "Ange ditt visningsnamn i profilen för att skriva inlägg"
-            : undefined
-        }
+        aria-label={t.newPost}
       >
         <PenLine className="w-4 h-4" />
-        Nytt inlägg
+        {t.newPost}
       </button>
 
       {/* Category bottom sheet */}
@@ -380,19 +417,24 @@ export default function FeedPage({
         categories={categories ?? []}
         activeCatId={activeCatId}
         onSelect={setActiveCatId}
+        t={{
+          categories: t.categories,
+          allPosts: t.allPosts,
+          closeCategories: t.closeCategories,
+        }}
       />
 
       <ScrollToTop />
 
       <footer className="py-6 text-center text-xs text-muted-foreground border-t border-border leaf-bg-footer">
-        © {new Date().getFullYear()}. 
+        © {new Date().getFullYear()}.
         <a
           href={`https://caffeine.ai?utm_source=caffeine-footer&utm_medium=referral&utm_content=${encodeURIComponent(window.location.hostname)}`}
           target="_blank"
           rel="noopener noreferrer"
           className="hover:text-foreground transition-colors"
         >
-          Byggd med ❤ via caffeine.ai
+          {t.footerBuilt}
         </a>
       </footer>
     </div>

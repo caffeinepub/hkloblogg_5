@@ -6,6 +6,8 @@ import { useEffect, useRef, useState } from "react";
 import { useActor } from "./hooks/useActor";
 import { useInternetIdentity } from "./hooks/useInternetIdentity";
 import { useIsAdmin, useMyProfile } from "./hooks/useQueries";
+import { LanguageProvider, useLang } from "./locales/LanguageContext";
+import { translations } from "./locales/translations";
 import AdminPanel from "./pages/AdminPanel";
 import FeedPage from "./pages/FeedPage";
 import LoginPage from "./pages/LoginPage";
@@ -35,6 +37,8 @@ function AppShell() {
   const [view, setView] = useState<View>({ name: "feed" });
   const [timedOut, setTimedOut] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { lang } = useLang();
+  const t = translations[lang];
 
   const isLoading =
     isInitializing ||
@@ -68,9 +72,7 @@ function AppShell() {
                 className="w-10 h-10 text-primary mx-auto"
                 strokeWidth={1.5}
               />
-              <p className="text-sm text-muted-foreground">
-                Inläsningen tar längre tid än väntat.
-              </p>
+              <p className="text-sm text-muted-foreground">{t.loadingLonger}</p>
               <div className="flex flex-col gap-2">
                 <Button
                   data-ocid="app.reload_button"
@@ -79,7 +81,7 @@ function AppShell() {
                   onClick={() => window.location.reload()}
                 >
                   <RefreshCw className="w-4 h-4 mr-2" />
-                  Ladda om sidan
+                  {t.reloadPage}
                 </Button>
                 {identity && (
                   <Button
@@ -89,7 +91,7 @@ function AppShell() {
                     className="text-muted-foreground"
                     onClick={clear}
                   >
-                    Logga ut och försök igen
+                    {t.logoutAndRetry}
                   </Button>
                 )}
               </div>
@@ -210,9 +212,9 @@ function AppShell() {
 
 export default function App() {
   return (
-    <>
+    <LanguageProvider>
       <AppShell />
       <Toaster position="bottom-right" richColors />
-    </>
+    </LanguageProvider>
   );
 }

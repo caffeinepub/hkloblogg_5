@@ -24,6 +24,9 @@ import {
   useListCategories,
   useMyLikedPosts,
 } from "../hooks/useQueries";
+import { useLang } from "../locales/LanguageContext";
+import { LANGUAGES, translations } from "../locales/translations";
+import type { Language } from "../locales/translations";
 
 interface MittFlodePageProps {
   onBack: () => void;
@@ -37,12 +40,14 @@ function PostCard({
   liked,
   onClick,
   index,
+  pinnedLabel,
 }: {
   post: Post;
   categoryName: string;
   liked: boolean;
   onClick: () => void;
   index: number;
+  pinnedLabel: string;
 }) {
   const date = new Date(Number(post.createdAt) / 1_000_000);
 
@@ -62,7 +67,7 @@ function PostCard({
               className="text-xs gap-1 bg-primary/10 text-primary border-primary/20"
             >
               <Pin className="w-3 h-3" />
-              Fastnålad
+              {pinnedLabel}
             </Badge>
           )}
           <Badge variant="outline" className="text-xs text-muted-foreground">
@@ -104,12 +109,16 @@ function FollowedPostCard({
   onClick,
   index,
   catMap,
+  unknownCategory,
+  pinnedLabel,
 }: {
   postId: string;
   liked: boolean;
   onClick: () => void;
   index: number;
   catMap: Map<string, string>;
+  unknownCategory: string;
+  pinnedLabel: string;
 }) {
   const { actor } = useActor();
   const { data: post, isLoading } = useQuery({
@@ -136,10 +145,11 @@ function FollowedPostCard({
   return (
     <PostCard
       post={post}
-      categoryName={catMap.get(post.categoryId) ?? "Okänd kategori"}
+      categoryName={catMap.get(post.categoryId) ?? unknownCategory}
       liked={liked}
       onClick={onClick}
       index={index}
+      pinnedLabel={pinnedLabel}
     />
   );
 }
@@ -156,6 +166,8 @@ export default function MittFlodePage({
     useGetFollowedPosts();
   const { data: likedPosts } = useMyLikedPosts();
   const { data: categories } = useListCategories();
+  const { lang, setLang } = useLang();
+  const t = translations[lang];
 
   const likedSet = new Set(likedPosts ?? []);
   const catMap = new Map((categories ?? []).map((c) => [c.id, c.name]));
@@ -163,6 +175,21 @@ export default function MittFlodePage({
   const sortedUserPosts = [...(followedUsersPosts ?? [])].sort((a, b) =>
     Number(b.createdAt - a.createdAt),
   );
+
+  const notifT = {
+    notifications: t.notifications,
+    markAllRead: t.markAllRead,
+    noNotifications: t.noNotifications,
+    newComment: t.newComment,
+    newReply: t.newReply,
+    newMedia: t.newMedia,
+    newEvent: t.newEvent,
+    justNow: t.justNow,
+    minutesAgo: t.minutesAgo,
+    hoursAgo: t.hoursAgo,
+    daysAgo: t.daysAgo,
+    postLabel: t.postLabel,
+  };
 
   return (
     <div className="min-h-screen leaf-bg-page flex flex-col">
@@ -176,24 +203,40 @@ export default function MittFlodePage({
               size="sm"
               onClick={onBack}
               className="text-muted-foreground -ml-2"
+              data-ocid="mitt_flode.back.button"
             >
               <ArrowLeft className="w-4 h-4 mr-1" />
-              Tillbaka
+              {t.back}
             </Button>
             <div className="flex items-center gap-2">
               <BookOpen className="w-5 h-5 text-primary" strokeWidth={1.5} />
               <span className="font-display text-xl text-foreground hidden sm:inline">
-                Mitt flöde
+                {t.myFeedTitle}
               </span>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <NotificationBell onPost={onPost} />
+            {/* Language selector */}
+            <select
+              value={lang}
+              onChange={(e) => setLang(e.target.value as Language)}
+              className="text-xs text-muted-foreground bg-transparent border border-border rounded px-1 py-0.5 cursor-pointer hover:text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+              aria-label="Select language"
+              data-ocid="mitt_flode.language.select"
+            >
+              {LANGUAGES.map(({ code, flag, label }) => (
+                <option key={code} value={code}>
+                  {flag} {label}
+                </option>
+              ))}
+            </select>
+            <NotificationBell onPost={onPost} t={notifT} />
             <Button
               variant="ghost"
               size="sm"
               onClick={clear}
               className="text-muted-foreground"
+              aria-label={t.logout}
             >
               <LogOut className="w-4 h-4" />
             </Button>
@@ -206,11 +249,11 @@ export default function MittFlodePage({
           <TabsList className="mb-6">
             <TabsTrigger value="users" className="gap-2">
               <Users className="w-4 h-4" />
-              Följda användare
+              {t.followedUsers}
             </TabsTrigger>
             <TabsTrigger value="posts" className="gap-2">
               <Rss className="w-4 h-4" />
-              Följda inlägg
+              {t.followedPosts}
             </TabsTrigger>
           </TabsList>
 
@@ -234,11 +277,9 @@ export default function MittFlodePage({
                   className="w-10 h-10 text-muted-foreground/40 mx-auto mb-4"
                   strokeWidth={1}
                 />
-                <p className="text-muted-foreground">
-                  Inga inlägg från följda användare ännu.
-                </p>
+                <p className="text-muted-foreground">{t.noPostsFromFollowed}</p>
                 <p className="text-sm text-muted-foreground/70 mt-1">
-                  Börja följa användare för att se deras inlägg här.
+                  {t.startFollowingUsers}
                 </p>
               </div>
             ) : (
@@ -248,11 +289,12 @@ export default function MittFlodePage({
                     key={post.id}
                     post={post}
                     categoryName={
-                      catMap.get(post.categoryId) ?? "Okänd kategori"
+                      catMap.get(post.categoryId) ?? t.unknownCategory
                     }
                     liked={likedSet.has(post.id)}
                     onClick={() => onPost(post.id)}
                     index={i + 1}
+                    pinnedLabel={t.pinned}
                   />
                 ))}
               </div>
@@ -279,11 +321,9 @@ export default function MittFlodePage({
                   className="w-10 h-10 text-muted-foreground/40 mx-auto mb-4"
                   strokeWidth={1}
                 />
-                <p className="text-muted-foreground">
-                  Du följer inga inlägg ännu.
-                </p>
+                <p className="text-muted-foreground">{t.noFollowedPosts}</p>
                 <p className="text-sm text-muted-foreground/70 mt-1">
-                  Klicka på "Följ inlägg" på ett inlägg för att följa det.
+                  {t.clickToFollowPost}
                 </p>
               </div>
             ) : (
@@ -296,6 +336,8 @@ export default function MittFlodePage({
                     onClick={() => onPost(postId)}
                     index={i + 1}
                     catMap={catMap}
+                    unknownCategory={t.unknownCategory}
+                    pinnedLabel={t.pinned}
                   />
                 ))}
               </div>
@@ -305,14 +347,14 @@ export default function MittFlodePage({
       </main>
 
       <footer className="py-6 text-center text-xs text-muted-foreground border-t border-border leaf-bg-footer">
-        © {new Date().getFullYear()}.{" "}
+        © {new Date().getFullYear()}.
         <a
           href={`https://caffeine.ai?utm_source=caffeine-footer&utm_medium=referral&utm_content=${encodeURIComponent(window.location.hostname)}`}
           target="_blank"
           rel="noopener noreferrer"
           className="hover:text-foreground transition-colors"
         >
-          Byggd med ❤ via caffeine.ai
+          {t.footerBuilt}
         </a>
       </footer>
     </div>

@@ -1,141 +1,131 @@
 import { Button } from "@/components/ui/button";
-import { BookOpen, Eye, Loader2, ShieldCheck } from "lucide-react";
 import { motion } from "motion/react";
+import LanguageSelector from "../components/LanguageSelector";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
+import { useLang } from "../locales/LanguageContext";
+import { translations } from "../locales/translations";
 
 export default function LoginPage() {
-  const { login, isLoggingIn, isInitializing } = useInternetIdentity();
+  const { login, isLoggingIn } = useInternetIdentity();
+  const { lang, setLang } = useLang();
+  const t = translations[lang];
 
   return (
-    <div className="min-h-screen leaf-bg-login flex flex-col">
-      {/* Decorative top bar */}
-      <div className="h-1 bg-primary w-full" />
+    <div
+      className="min-h-screen flex flex-col items-center justify-center px-4 py-12 relative overflow-hidden"
+      style={{
+        background:
+          "linear-gradient(135deg, oklch(0.97 0.01 220) 0%, oklch(0.95 0.02 210) 50%, oklch(0.96 0.015 230) 100%)",
+      }}
+    >
+      {/* Decorative background */}
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          backgroundImage: `url('/assets/uploads/20260319_111140-1.jpg')`,
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          opacity: 0.12,
+        }}
+      />
 
-      <main className="flex-1 flex flex-col items-center justify-center px-4 py-10">
-        <motion.div
-          initial={{ opacity: 0, y: 24 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, ease: "easeOut" }}
-          className="w-full max-w-sm"
-        >
-          {/* Logo + title */}
-          <div className="text-center mb-6">
-            <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-primary/10 mb-5">
-              <BookOpen className="w-7 h-7 text-primary" strokeWidth={1.5} />
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
+        className="relative z-10 w-full max-w-md"
+      >
+        {/* Language selector */}
+        <div className="flex justify-end mb-4">
+          <LanguageSelector currentLang={lang} onChange={setLang} />
+        </div>
+
+        <div className="bg-card/95 backdrop-blur-sm rounded-2xl shadow-xl border border-border p-8">
+          {/* Logo & title */}
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-primary/10 mb-4">
+              <svg
+                role="img"
+                aria-label="Blog icon"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={1.5}
+                className="w-7 h-7 text-primary"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.966 8.966 0 00-6 2.292m0-14.25v14.25"
+                />
+              </svg>
             </div>
-            <h1 className="font-display text-4xl text-foreground mb-1">
+            <h1 className="font-display text-3xl text-foreground mb-1">
               HKLOblogg
             </h1>
-            <p className="text-muted-foreground text-sm">
-              En plattform för åsiktsfrihet, yttrandefrihet och respektfull
-              dialog
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              {t.tagline}
             </p>
-            <p className="text-muted-foreground text-xs mt-1">
-              – med fokus på integritet och GDPR
+            <p className="text-xs text-muted-foreground/70 mt-1">
+              {t.tagline2}
             </p>
           </div>
 
-          {/* Login card */}
-          <div className="bg-card border border-border rounded-xl p-8 shadow-card">
-            <h2 className="text-lg font-semibold text-foreground mb-2">
-              Välkommen
+          {/* Login section */}
+          <div className="mb-6">
+            <h2 className="text-base font-semibold text-foreground mb-1">
+              {t.welcome}
             </h2>
-            <p className="text-sm text-muted-foreground mb-6">
-              Logga in med Internet Identity för att läsa och delta.
-            </p>
-
+            <p className="text-sm text-muted-foreground mb-4">{t.loginDesc}</p>
             <Button
-              data-ocid="login.primary_button"
+              data-ocid="login.submit_button"
               onClick={login}
-              disabled={isLoggingIn || isInitializing}
-              className="w-full h-11"
+              disabled={isLoggingIn}
+              className="w-full"
+              size="lg"
             >
-              {isLoggingIn ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Loggar in…
-                </>
-              ) : (
-                "Logga in med Internet Identity"
-              )}
+              {isLoggingIn ? t.loggingIn : t.loginButton}
             </Button>
-
-            <p className="text-xs text-muted-foreground text-center mt-4">
-              Ny användare?{" "}
+            <p className="text-xs text-muted-foreground/70 mt-3 text-center">
+              {t.newUser}{" "}
               <a
-                href="https://identity.ic0.app/"
+                href="https://identity.ic0.app"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-primary hover:underline font-medium"
+                className="text-primary hover:underline"
               >
-                Skapa ett Internet Identity här
+                {t.createIdentity}
               </a>
             </p>
           </div>
 
-          {/* Transparency notice */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.25, duration: 0.5 }}
-            className="mt-5 bg-muted/50 border border-border rounded-xl p-5"
-          >
-            <div className="flex items-center gap-2 mb-2">
-              <Eye className="w-4 h-4 text-primary flex-shrink-0" />
-              <span className="text-xs font-semibold text-foreground uppercase tracking-wide">
-                Transparens
-              </span>
+          {/* Info sections */}
+          <div className="space-y-4 border-t border-border pt-6">
+            <div>
+              <h3 className="text-xs font-semibold text-foreground uppercase tracking-wide mb-1">
+                {t.transparencyTitle}
+              </h3>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                {t.transparencyText}
+              </p>
             </div>
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              Bloggen drivs på Internet Computer Protocol (ICP), en
-              decentraliserad blockkedja. Det innebär att plattformens kod och
-              data är driftsatt på ICP och kan verifieras -- ingen enskild part
-              kontrollerar eller kan manipulera infrastrukturen.
-            </p>
-          </motion.div>
-
-          {/* GDPR clarification */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.3, duration: 0.5 }}
-            className="mt-4 bg-muted/50 border border-border rounded-xl p-5"
-          >
-            <div className="flex items-center gap-2 mb-2">
-              <ShieldCheck className="w-4 h-4 text-primary flex-shrink-0" />
-              <span className="text-xs font-semibold text-foreground uppercase tracking-wide">
-                Förtydligande – Rätten att bli glömd
-              </span>
+            <div>
+              <h3 className="text-xs font-semibold text-foreground uppercase tracking-wide mb-1">
+                {t.gdprTitle}
+              </h3>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                {t.gdprText}
+                <span className="font-medium">{t.gdprIcp}</span>
+                {t.gdprText2}
+              </p>
             </div>
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              Du har rätt att bli glömd – Du kan själv radera ditt konto, och
-              alla dina inlägg och kommentarer kommer att tas bort från
-              HKLO-bloggens synliga gränssnitt. Observera dock att eftersom
-              innehållet lagras på{" "}
-              <strong className="text-foreground">
-                Internet Computer Protocol (ICP)
-              </strong>
-              , en typ av blockkedja, är det tekniskt omöjligt att helt radera
-              information som en gång har skrivits in i blockkedjan. Det innebär
-              att innehållet kan finnas kvar i blockkedjans historik, men det
-              kommer inte längre att vara tillgängligt eller synligt för andra
-              användare på HKLO-bloggen.
-            </p>
-          </motion.div>
-        </motion.div>
-      </main>
+          </div>
+        </div>
 
-      <footer className="py-6 text-center text-xs text-muted-foreground leaf-bg-footer">
-        © {new Date().getFullYear()}.{" "}
-        <a
-          href={`https://caffeine.ai?utm_source=caffeine-footer&utm_medium=referral&utm_content=${encodeURIComponent(window.location.hostname)}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="hover:text-foreground transition-colors"
-        >
-          Byggd med ❤ via caffeine.ai
-        </a>
-      </footer>
+        <p className="text-center text-xs text-muted-foreground/60 mt-6">
+          {t.footerBuilt}
+        </p>
+      </motion.div>
     </div>
   );
 }

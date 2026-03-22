@@ -5,13 +5,26 @@ import type { Category } from "../backend.d";
 
 const MotionDialog = motion.create("dialog");
 
+interface CategorySheetTranslations {
+  categories: string;
+  allPosts: string;
+  closeCategories: string;
+}
+
 interface CategoryBottomSheetProps {
   open: boolean;
   onClose: () => void;
   categories: Category[];
   activeCatId: string | null;
   onSelect: (id: string | null) => void;
+  t?: CategorySheetTranslations;
 }
+
+const defaultT: CategorySheetTranslations = {
+  categories: "Kategorier",
+  allPosts: "Alla inlägg",
+  closeCategories: "Stäng kategoripanel",
+};
 
 export default function CategoryBottomSheet({
   open,
@@ -19,6 +32,7 @@ export default function CategoryBottomSheet({
   categories,
   activeCatId,
   onSelect,
+  t = defaultT,
 }: CategoryBottomSheetProps) {
   const sheetRef = useRef<HTMLDialogElement>(null);
   const dragStartY = useRef<number | null>(null);
@@ -125,7 +139,7 @@ export default function CategoryBottomSheet({
             ref={sheetRef}
             open
             data-ocid="category_sheet.panel"
-            aria-label="V\u00e4lj kategori"
+            aria-label="Välj kategori"
             initial={{ y: "100%" }}
             animate={{ y: 0 }}
             exit={{ y: "100%" }}
@@ -144,13 +158,13 @@ export default function CategoryBottomSheet({
             {/* Header */}
             <div className="flex items-center justify-between px-5 py-3 shrink-0 border-b border-border">
               <h2 className="font-display text-base font-semibold text-foreground">
-                Kategorier
+                {t.categories}
               </h2>
               <button
                 type="button"
                 data-ocid="category_sheet.close_button"
                 onClick={onClose}
-                aria-label="St\u00e4ng kategoripanel"
+                aria-label={t.closeCategories}
                 className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <X className="w-4 h-4" />
@@ -169,7 +183,7 @@ export default function CategoryBottomSheet({
                     : "text-foreground hover:bg-muted"
                 }`}
               >
-                Alla inl\u00e4gg
+                {t.allPosts}
               </button>
               {categories.map((cat) => (
                 <button
