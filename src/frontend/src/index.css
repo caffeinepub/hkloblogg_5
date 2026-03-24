@@ -119,6 +119,9 @@
 
 /* ─── React-Quill (rich editor) overrides ─────────────────────────── */
 .ql-toolbar.ql-snow {
+  position: sticky;
+  top: 0;
+  z-index: 20;
   border: 1px solid oklch(var(--border));
   border-bottom: none;
   border-radius: var(--radius) var(--radius) 0 0;
@@ -179,7 +182,7 @@
   position: absolute;
   right: 8px;
   top: 7px;
-  z-index: 5;
+  z-index: 25;
 }
 
 /* ─── Leaf pattern decorative backgrounds ──────────────────────────── */

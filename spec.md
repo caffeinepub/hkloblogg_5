@@ -1,43 +1,28 @@
-# HKLOblogg – Fas 3: Fullständig flerspråkig UI
+# hkloblogg-dol
 
 ## Current State
-Fas 1 och Fas 2 är klara. translations.ts innehåller nycklar för: inloggningssidan, headern, subnavigationen, kategoripanelen, MittFlödePage och FeedPage (banners). LanguageContext och useLang() är på plats. Språkväljare finns på inloggningssidan och i headern.
-
-Komponenter som SAKNAR översättning:
-- FeedPage – postkort (datum, läs-tid, kommentarantal, like-knapp, kategoritext)
-- PostView – inläggsvy (redigera, radera, verifiera, följa, gillningar)
-- CommentsSection – kommentarer (svara, gilla, skicka, tomt tillstånd)
-- PostForm – skapa/redigera inlägg (formulärfält, knappar, valideringsfel)
-- ProfilePage – profil (spara, radera konto, felmeddelanden)
-- AdminPanel – hela adminpanelen (flikar, knappar, sökfält, bekräftelsedialoger)
-- MediaUploader – uppladdningsinstruktioner och felmeddelanden
-- AuthorName, NotificationBell (partiella)
-- Generella felmeddelanden och bekräftelsedialoger
+The blog has a rich text editor with sticky toolbar and emoji picker for both posts and comments. The toolbar includes formatting buttons (bold, italic, headings, etc.).
 
 ## Requested Changes (Diff)
 
 ### Add
-- Hundratals nya översättningsnycklar i translations.ts för alla 5 språk (EN, SV, FR, DE, ES) som täcker: postkort, inläggsvy, kommentarer, postformulär, profil, adminpanel, felmeddelanden
+- A word lookup button in the editor toolbar (both posts and comments)
+- When a word is selected/highlighted in the editor, clicking the button opens a small popup with 4 options:
+  - Synonymer (SV) → opens synonymer.se/?ord=[word] in new tab
+  - Synonymer (EN) → opens thesaurus.com/browse/[word] in new tab
+  - Definition (SV) → opens svenska.se/tri/f_saol.php?sok=[word] in new tab
+  - Definition (EN) → opens merriam-webster.com/dictionary/[word] in new tab
+- If no word is selected, the button is disabled or shows a tooltip "Markera ett ord först"
 
 ### Modify
-- FeedPage.tsx: använd useLang() för alla UI-texter på postkorten
-- PostView.tsx: använd useLang() för knappar, etiketter, dialoger, verifieringspanel
-- CommentsSection.tsx: använd useLang() för alla kommentarsrelaterade texter
-- PostForm.tsx: använd useLang() för formulärfält, knappar, valideringsmeddelanden
-- ProfilePage.tsx: använd useLang() för alla texter inkl. raderingsdialog
-- AdminPanel.tsx: använd useLang() för flikar, knappar, sökfält, bekräftelsedialoger
-- MediaUploader.tsx: använd useLang() för uppladdningsinstruktioner och fel
+- RichTextEditor component toolbar to include the new lookup button
 
 ### Remove
-- Inga hårdkodade svenska/engelska UI-strängar kvar i ovan nämnda komponenter
+- Nothing
 
 ## Implementation Plan
-1. Utöka translations.ts med alla nya nycklar för alla 5 språk
-2. Uppdatera FeedPage (postkort-delar)
-3. Uppdatera PostView
-4. Uppdatera CommentsSection
-5. Uppdatera PostForm
-6. Uppdatera ProfilePage
-7. Uppdatera AdminPanel
-8. Uppdatera MediaUploader
-9. Validera (lint + typecheck + build)
+1. Add a lookup icon button to the RichTextEditor toolbar
+2. On click, read the currently selected text from the editor
+3. Show a small dropdown/popover with the 4 external links, each opening in a new tab with the selected word appended
+4. Disable button (or show tooltip) when no text is selected
+5. Validate and build
