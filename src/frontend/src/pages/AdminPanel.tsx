@@ -345,12 +345,18 @@ function CategoryRow({
                 onSubmit={async (e) => {
                   e.preventDefault();
                   if (!editName.trim()) return;
-                  await updateCategory.mutateAsync({
-                    id: category.id,
-                    name: editName.trim(),
-                  });
-                  setEditingName(false);
-                  toast.success("Category name updated");
+                  try {
+                    await updateCategory.mutateAsync({
+                      id: category.id,
+                      name: editName.trim(),
+                    });
+                    setEditingName(false);
+                    toast.success(t.categorySaved || "Category name updated");
+                  } catch {
+                    toast.error(
+                      t.errorOccurred || "Could not save category name",
+                    );
+                  }
                 }}
               >
                 <Input

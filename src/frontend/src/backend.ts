@@ -1147,6 +1147,63 @@ export class Backend implements backendInterface {
             return result;
         }
     }
+    async updateCategory(id: string, name: string): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await (this.actor as any).updateCategory(id, name);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await (this.actor as any).updateCategory(id, name);
+            return result;
+        }
+    }
+    async addUserToCategoryAllowedList(categoryId: string, user: import("@icp-sdk/core/principal").Principal): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await (this.actor as any).addUserToCategoryAllowedList(categoryId, user);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await (this.actor as any).addUserToCategoryAllowedList(categoryId, user);
+            return result;
+        }
+    }
+    async removeUserFromCategoryAllowedList(categoryId: string, user: import("@icp-sdk/core/principal").Principal): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await (this.actor as any).removeUserFromCategoryAllowedList(categoryId, user);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await (this.actor as any).removeUserFromCategoryAllowedList(categoryId, user);
+            return result;
+        }
+    }
+    async getCategoryAllowedUsers(categoryId: string): Promise<Array<import("@icp-sdk/core/principal").Principal>> {
+        if (this.processError) {
+            try {
+                const result = await (this.actor as any).getCategoryAllowedUsers(categoryId);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await (this.actor as any).getCategoryAllowedUsers(categoryId);
+            return result;
+        }
+    }
+
 }
 function from_candid_Comment_n21(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _Comment): Comment {
     return from_candid_record_n22(_uploadFile, _downloadFile, value);
