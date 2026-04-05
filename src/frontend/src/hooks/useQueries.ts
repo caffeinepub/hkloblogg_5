@@ -315,6 +315,20 @@ export function useDeleteCategory() {
   });
 }
 
+export function useUpdateCategory() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, name }: { id: string; name: string }) => {
+      if (!actor) throw new Error("Inte inloggad");
+      return fullActor(actor).updateCategory(id, name);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["categories"] });
+    },
+  });
+}
+
 export function useCreatePost() {
   const { actor } = useActor();
   const queryClient = useQueryClient();

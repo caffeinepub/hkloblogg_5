@@ -545,6 +545,19 @@ actor {
     categories.add(id, category);
   };
 
+  public shared ({ caller }) func updateCategory(id : Text, name : Text) : async () {
+    if (not (AccessControl.isAdmin(accessControlState, caller))) {
+      Runtime.trap("Unauthorized: Only superadmin can update categories");
+    };
+    switch (categories.get(id)) {
+      case null { Runtime.trap("Category not found") };
+      case (?existing) {
+        let updated : Category = { id = existing.id; name; createdBy = existing.createdBy; createdAt = existing.createdAt };
+        categories.add(id, updated);
+      };
+    };
+  };
+
   public shared ({ caller }) func deleteCategory(id : Text) : async () {
     if (not (AccessControl.isAdmin(accessControlState, caller))) {
       Runtime.trap("Unauthorized: Only superadmin can delete categories");

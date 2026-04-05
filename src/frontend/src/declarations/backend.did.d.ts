@@ -126,6 +126,7 @@ export interface _SERVICE {
   'createComment' : ActorMethod<[string, string, [] | [string]], undefined>,
   'createPost' : ActorMethod<[string, string, string], string>,
   'deleteCategory' : ActorMethod<[string], undefined>,
+  'updateCategory' : ActorMethod<[string, string], undefined>,
   'getHiddenCategoryIds' : ActorMethod<[], Array<string>>,
   'toggleCategoryHidden' : ActorMethod<[string, boolean], undefined>,
   'addUserToCategoryAllowedList' : ActorMethod<[string, Principal], undefined>,

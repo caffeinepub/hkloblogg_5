@@ -43,6 +43,7 @@ import {
   Images,
   Loader2,
   MessageCircle,
+  Pencil,
   Pin,
   PinOff,
   Plus,
@@ -93,6 +94,7 @@ import {
   useSetRole,
   useToggleCategoryHidden,
   useUnblockUser,
+  useUpdateCategory,
 } from "../hooks/useQueries";
 import { useLang } from "../locales/LanguageContext";
 import { translations } from "../locales/translations";
@@ -212,6 +214,9 @@ function CategoryRow({
   t: Record<string, string>;
 }) {
   const deleteCategory = useDeleteCategory();
+  const updateCategory = useUpdateCategory();
+  const [editingName, setEditingName] = useState(false);
+  const [editName, setEditName] = useState(category.name);
   const toggleHidden = useToggleCategoryHidden();
   const [showWhitelist, setShowWhitelist] = useState(false);
   const [showSchedule, setShowSchedule] = useState(false);
@@ -334,7 +339,55 @@ function CategoryRow({
       >
         <TableCell className="font-medium">
           <div className="flex items-center gap-2">
-            {category.name}
+            {editingName ? (
+              <form
+                className="flex items-center gap-1"
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  if (!editName.trim()) return;
+                  await updateCategory.mutateAsync({
+                    id: category.id,
+                    name: editName.trim(),
+                  });
+                  setEditingName(false);
+                  toast.success("Category name updated");
+                }}
+              >
+                <Input
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  className="h-7 text-sm w-48"
+                  autoFocus
+                />
+                <Button
+                  type="submit"
+                  size="sm"
+                  variant="ghost"
+                  disabled={updateCategory.isPending}
+                  className="h-7 px-2 text-green-600"
+                >
+                  {updateCategory.isPending ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : (
+                    "✓"
+                  )}
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 px-2"
+                  onClick={() => {
+                    setEditingName(false);
+                    setEditName(category.name);
+                  }}
+                >
+                  ✕
+                </Button>
+              </form>
+            ) : (
+              category.name
+            )}
             {isHidden && (
               <Badge variant="secondary" className="text-xs gap-1">
                 <EyeOff className="h-2.5 w-2.5" />
@@ -350,6 +403,19 @@ function CategoryRow({
         </TableCell>
         <TableCell className="text-right">
           <div className="flex items-center justify-end gap-1">
+            <Button
+              data-ocid={`admin.categories.edit_button.${index}`}
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setEditingName(true);
+                setEditName(category.name);
+              }}
+              title="Edit category name"
+              className="text-muted-foreground hover:text-foreground"
+            >
+              <Pencil className="h-4 w-4" />
+            </Button>
             <Button
               data-ocid={`admin.categories.toggle.${index}`}
               variant="ghost"

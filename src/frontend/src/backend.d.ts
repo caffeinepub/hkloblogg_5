@@ -96,6 +96,7 @@ export interface backendInterface {
     createComment(postId: string, body: string, parentId: string | null): Promise<void>;
     createPost(title: string, body: string, categoryId: string): Promise<string>;
     deleteCategory(id: string): Promise<void>;
+    updateCategory(id: string, name: string): Promise<void>;
     toggleCategoryHidden(id: string, hidden: boolean): Promise<void>;
     getHiddenCategoryIds(): Promise<Array<string>>;
     addUserToCategoryAllowedList(categoryId: string, user: Principal): Promise<void>;
