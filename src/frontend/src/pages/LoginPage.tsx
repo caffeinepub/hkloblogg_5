@@ -1,13 +1,12 @@
 import { Button } from "@/components/ui/button";
 import { motion } from "motion/react";
-import LanguageSelector from "../components/LanguageSelector";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import { useLang } from "../locales/LanguageContext";
 import { translations } from "../locales/translations";
 
 export default function LoginPage() {
   const { login, isLoggingIn } = useInternetIdentity();
-  const { lang, setLang } = useLang();
+  const { lang } = useLang();
   const t = translations[lang];
 
   return (
@@ -35,11 +34,6 @@ export default function LoginPage() {
         transition={{ duration: 0.4 }}
         className="relative z-10 w-full max-w-md"
       >
-        {/* Language selector */}
-        <div className="flex justify-end mb-4">
-          <LanguageSelector currentLang={lang} onChange={setLang} />
-        </div>
-
         <div className="bg-card/95 backdrop-blur-sm rounded-2xl shadow-xl border border-border p-8">
           {/* Logo & title */}
           <div className="text-center mb-8">

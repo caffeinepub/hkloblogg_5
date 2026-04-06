@@ -75,8 +75,7 @@ import {
 import { useStorageClient } from "../hooks/useStorageClient";
 import { readTime } from "../lib/readTime";
 import { useLang } from "../locales/LanguageContext";
-import { LANGUAGES, translations } from "../locales/translations";
-import type { Language } from "../locales/translations";
+import { translations } from "../locales/translations";
 
 interface PostViewProps {
   postId: string;
@@ -94,7 +93,7 @@ export default function PostView({
   onSearch,
 }: PostViewProps) {
   const { clear, identity } = useInternetIdentity();
-  const { lang, setLang } = useLang();
+  const { lang } = useLang();
   const t = translations[lang];
   const { data: isAdmin } = useIsAdmin();
   const { data: isModerator } = useIsModerator();
@@ -288,21 +287,6 @@ export default function PostView({
               </div>
             </form>
 
-            {/* Language selector */}
-            <select
-              value={lang}
-              onChange={(e) => setLang(e.target.value as Language)}
-              className="text-xs text-muted-foreground bg-transparent border border-border rounded px-1 py-0.5 cursor-pointer hover:text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-              aria-label="Select language"
-              data-ocid="post.language.select"
-            >
-              {LANGUAGES.map(({ code, flag, label }) => (
-                <option key={code} value={code}>
-                  {flag} {label}
-                </option>
-              ))}
-            </select>
-
             {/* Admin panel – desktop */}
             {isAdmin && (
               <Button
@@ -445,7 +429,7 @@ export default function PostView({
                 </>
               )}
               <span>·</span>
-              <span>{readTime(post.body)}</span>
+              <span>{readTime(post.body, lang)}</span>
             </div>
 
             <Separator className="mb-8" />

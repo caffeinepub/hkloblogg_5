@@ -21,7 +21,8 @@ import { UserRole } from "../backend.d";
 import type { UserProfile } from "../backend.d";
 import { useDeleteMyAccount, useRegister } from "../hooks/useQueries";
 import { useLang } from "../locales/LanguageContext";
-import { translations } from "../locales/translations";
+import { LANGUAGES, translations } from "../locales/translations";
+import type { Language } from "../locales/translations";
 
 interface ProfilePageProps {
   profile: UserProfile | null;
@@ -186,7 +187,7 @@ export default function ProfilePage({
   onLogout,
 }: ProfilePageProps) {
   const deleteMyAccount = useDeleteMyAccount();
-  const { lang } = useLang();
+  const { lang, setLang } = useLang();
   const t = translations[lang];
   const [confirmAlias, setConfirmAlias] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -296,6 +297,31 @@ export default function ProfilePage({
                 <span className="text-muted-foreground">{t.registered}</span>
                 <span className="text-foreground">{registeredDate}</span>
               </div>
+            </div>
+          </div>
+
+          {/* Language */}
+          <div className="bg-card border border-border rounded-xl p-6 shadow-card space-y-4">
+            <h3 className="text-sm font-medium text-foreground">
+              {t.language ?? "Language"}
+            </h3>
+            <div className="flex flex-wrap gap-2">
+              {LANGUAGES.map(({ code, label, flag }) => (
+                <button
+                  key={code}
+                  type="button"
+                  onClick={() => setLang(code as Language)}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition-all duration-150 ${
+                    lang === code
+                      ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                      : "bg-background text-muted-foreground border-border hover:bg-muted hover:text-foreground"
+                  }`}
+                  aria-pressed={lang === code}
+                >
+                  <span>{flag}</span>
+                  <span>{label}</span>
+                </button>
+              ))}
             </div>
           </div>
 

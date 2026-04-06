@@ -34,7 +34,7 @@ import {
 } from "../hooks/useQueries";
 import { readTime } from "../lib/readTime";
 import { useLang } from "../locales/LanguageContext";
-import { LANGUAGES, translations } from "../locales/translations";
+import { translations } from "../locales/translations";
 import type { Language } from "../locales/translations";
 
 interface FeedPageProps {
@@ -68,6 +68,7 @@ function PostCard({
   onClick,
   index,
   pinnedLabel,
+  lang,
 }: {
   post: Post;
   categoryName: string;
@@ -75,6 +76,7 @@ function PostCard({
   onClick: () => void;
   index: number;
   pinnedLabel: string;
+  lang: Language;
 }) {
   const date = new Date(Number(post.createdAt) / 1_000_000);
 
@@ -131,7 +133,7 @@ function PostCard({
           })}
         </time>
         <span>·</span>
-        <span>{readTime(post.body)}</span>
+        <span>{readTime(post.body, lang as Language)}</span>
       </div>
     </motion.article>
   );
@@ -155,7 +157,7 @@ export default function FeedPage({
   const { data: likedPosts } = useMyLikedPosts();
   const [searchInput, setSearchInput] = useState("");
   const [sheetOpen, setSheetOpen] = useState(false);
-  const { lang, setLang } = useLang();
+  const { lang } = useLang();
   const t = translations[lang];
 
   const likedSet = new Set(likedPosts ?? []);
@@ -224,21 +226,6 @@ export default function FeedPage({
                 />
               </div>
             </form>
-
-            {/* Language selector */}
-            <select
-              value={lang}
-              onChange={(e) => setLang(e.target.value as Language)}
-              className="text-xs text-muted-foreground bg-transparent border border-border rounded px-1 py-0.5 cursor-pointer hover:text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-              aria-label="Select language"
-              data-ocid="feed.language.select"
-            >
-              {LANGUAGES.map(({ code, flag, label }) => (
-                <option key={code} value={code}>
-                  {flag} {label}
-                </option>
-              ))}
-            </select>
 
             {/* Notification bell */}
             {identity && hasProfile && (
@@ -387,6 +374,7 @@ export default function FeedPage({
                 onClick={() => onPost(post.id)}
                 index={i + 1}
                 pinnedLabel={t.pinned}
+                lang={lang}
               />
             ))}
           </div>

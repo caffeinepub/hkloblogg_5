@@ -3,6 +3,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Toaster } from "@/components/ui/sonner";
 import { BookOpen, RefreshCw } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import TopPostsSidebar from "./components/TopPostsSidebar";
 import { useActor } from "./hooks/useActor";
 import { useInternetIdentity } from "./hooks/useInternetIdentity";
 import { useIsAdmin, useMyProfile } from "./hooks/useQueries";
@@ -124,13 +125,22 @@ function AppShell() {
 
   const hasProfile = !!profile;
 
+  // Sidebar: shown on all authenticated views except admin panel
+  const showSidebar = view.name !== "admin";
+  const sidebarEl = showSidebar ? (
+    <TopPostsSidebar onPost={(id) => setView({ name: "post", postId: id })} />
+  ) : null;
+
   if (view.name === "profile") {
     return (
-      <ProfilePage
-        profile={profile ?? null}
-        onBack={() => setView({ name: "feed" })}
-        onLogout={clear}
-      />
+      <>
+        <ProfilePage
+          profile={profile ?? null}
+          onBack={() => setView({ name: "feed" })}
+          onLogout={clear}
+        />
+        {sidebarEl}
+      </>
     );
   }
 
@@ -140,73 +150,95 @@ function AppShell() {
 
   if (view.name === "search") {
     return (
-      <SearchPage
-        initialQuery={view.query}
-        onBack={() => setView({ name: "feed" })}
-        onPost={(postId) => setView({ name: "post", postId })}
-      />
+      <>
+        <SearchPage
+          initialQuery={view.query}
+          onBack={() => setView({ name: "feed" })}
+          onPost={(postId) => setView({ name: "post", postId })}
+        />
+        {sidebarEl}
+      </>
     );
   }
 
   if (view.name === "myFeed") {
     return (
-      <MittFlodePage
-        onBack={() => setView({ name: "feed" })}
-        onPost={(postId) => setView({ name: "post", postId })}
-        onProfile={() => setView({ name: "profile" })}
-      />
+      <>
+        <MittFlodePage
+          onBack={() => setView({ name: "feed" })}
+          onPost={(postId) => setView({ name: "post", postId })}
+          onProfile={() => setView({ name: "profile" })}
+        />
+        {sidebarEl}
+      </>
     );
   }
 
   if (view.name === "post") {
     return (
-      <PostView
-        postId={view.postId}
-        onBack={() => setView({ name: "feed" })}
-        onEdit={(id) => setView({ name: "edit-post", postId: id })}
-        onAdminPanel={() => setView({ name: "admin" })}
-        onSearch={(query) => setView({ name: "search", query })}
-      />
+      <>
+        <PostView
+          postId={view.postId}
+          onBack={() => setView({ name: "feed" })}
+          onEdit={(id) => setView({ name: "edit-post", postId: id })}
+          onAdminPanel={() => setView({ name: "admin" })}
+          onSearch={(query) => setView({ name: "search", query })}
+        />
+        {sidebarEl}
+      </>
     );
   }
 
   if (view.name === "create-post") {
     return (
-      <PostForm
-        mode="create"
-        onBack={() => setView({ name: "feed" })}
-        onSuccess={(postId) =>
-          postId ? setView({ name: "post", postId }) : setView({ name: "feed" })
-        }
-        onAdminPanel={() => setView({ name: "admin" })}
-      />
+      <>
+        <PostForm
+          mode="create"
+          onBack={() => setView({ name: "feed" })}
+          onSuccess={(postId) =>
+            postId
+              ? setView({ name: "post", postId })
+              : setView({ name: "feed" })
+          }
+          onAdminPanel={() => setView({ name: "admin" })}
+        />
+        {sidebarEl}
+      </>
     );
   }
 
   if (view.name === "edit-post") {
     return (
-      <PostForm
-        mode="edit"
-        postId={view.postId}
-        onBack={() => setView({ name: "post", postId: view.postId })}
-        onSuccess={(postId) =>
-          postId ? setView({ name: "post", postId }) : setView({ name: "feed" })
-        }
-        onAdminPanel={() => setView({ name: "admin" })}
-      />
+      <>
+        <PostForm
+          mode="edit"
+          postId={view.postId}
+          onBack={() => setView({ name: "post", postId: view.postId })}
+          onSuccess={(postId) =>
+            postId
+              ? setView({ name: "post", postId })
+              : setView({ name: "feed" })
+          }
+          onAdminPanel={() => setView({ name: "admin" })}
+        />
+        {sidebarEl}
+      </>
     );
   }
 
   return (
-    <FeedPage
-      hasProfile={hasProfile}
-      onPost={(id) => setView({ name: "post", postId: id })}
-      onCreatePost={() => setView({ name: "create-post" })}
-      onAdminPanel={() => setView({ name: "admin" })}
-      onSearch={(query) => setView({ name: "search", query })}
-      onProfile={() => setView({ name: "profile" })}
-      onMyFeed={() => setView({ name: "myFeed" })}
-    />
+    <>
+      <FeedPage
+        hasProfile={hasProfile}
+        onPost={(id) => setView({ name: "post", postId: id })}
+        onCreatePost={() => setView({ name: "create-post" })}
+        onAdminPanel={() => setView({ name: "admin" })}
+        onSearch={(query) => setView({ name: "search", query })}
+        onProfile={() => setView({ name: "profile" })}
+        onMyFeed={() => setView({ name: "myFeed" })}
+      />
+      {sidebarEl}
+    </>
   );
 }
 

@@ -178,6 +178,7 @@ export const translations: Record<Language, Record<string, string>> = {
     roleAdmin: "Administrator",
     roleUser: "User",
     dangerZone: "Danger zone",
+    language: "Language",
     dangerZoneDesc:
       "Deleting your account is permanent and cannot be undone. All your posts and comments will be deleted.",
     yourDisplayName: "Your display name",
@@ -285,6 +286,9 @@ export const translations: Record<Language, Record<string, string>> = {
     unauthorized: "You are not authorized to perform this action.",
     notFound: "Not found.",
     sessionExpired: "Your session has expired. Please log in again.",
+    topPosts: "Top Posts",
+    mostLiked: "Most Liked",
+    mostCommented: "Most Commented",
   },
   sv: {
     tagline:
@@ -446,6 +450,7 @@ export const translations: Record<Language, Record<string, string>> = {
     roleAdmin: "Administratör",
     roleUser: "Användare",
     dangerZone: "Farlig zon",
+    language: "Språk",
     dangerZoneDesc:
       "Att radera ditt konto är permanent och kan inte ångras. Alla dina inlägg och kommentarer kommer att raderas.",
     yourDisplayName: "Ditt visningsnamn",
@@ -550,6 +555,9 @@ export const translations: Record<Language, Record<string, string>> = {
     unauthorized: "Du har inte behörighet att utföra denna åtgärd.",
     notFound: "Hittades inte.",
     sessionExpired: "Din session har gått ut. Logga in igen.",
+    topPosts: "Toppinlägg",
+    mostLiked: "Mest gillade",
+    mostCommented: "Mest kommenterade",
   },
   fr: {
     tagline:
@@ -713,6 +721,7 @@ export const translations: Record<Language, Record<string, string>> = {
     roleAdmin: "Administrateur",
     roleUser: "Utilisateur",
     dangerZone: "Zone dangereuse",
+    language: "Langue",
     dangerZoneDesc:
       "La suppression de votre compte est permanente et ne peut pas être annulée. Tous vos articles et commentaires seront supprimés.",
     yourDisplayName: "Votre nom d'affichage",
@@ -818,6 +827,9 @@ export const translations: Record<Language, Record<string, string>> = {
     unauthorized: "Vous n'êtes pas autorisé à effectuer cette action.",
     notFound: "Introuvable.",
     sessionExpired: "Votre session a expiré. Veuillez vous reconnecter.",
+    topPosts: "Meilleurs articles",
+    mostLiked: "Plus aimés",
+    mostCommented: "Plus commentés",
   },
   de: {
     tagline:
@@ -983,6 +995,7 @@ export const translations: Record<Language, Record<string, string>> = {
     roleAdmin: "Administrator",
     roleUser: "Benutzer",
     dangerZone: "Gefahrenzone",
+    language: "Sprache",
     dangerZoneDesc:
       "Das Löschen Ihres Kontos ist dauerhaft und kann nicht rückgängig gemacht werden. Alle Ihre Beiträge und Kommentare werden gelöscht.",
     yourDisplayName: "Ihr Anzeigename",
@@ -1090,6 +1103,9 @@ export const translations: Record<Language, Record<string, string>> = {
     notFound: "Nicht gefunden.",
     sessionExpired:
       "Ihre Sitzung ist abgelaufen. Bitte melden Sie sich erneut an.",
+    topPosts: "Top Beiträge",
+    mostLiked: "Meist gemocht",
+    mostCommented: "Meist kommentiert",
   },
   es: {
     tagline:
@@ -1252,6 +1268,7 @@ export const translations: Record<Language, Record<string, string>> = {
     roleAdmin: "Administrador",
     roleUser: "Usuario",
     dangerZone: "Zona peligrosa",
+    language: "Idioma",
     dangerZoneDesc:
       "Eliminar tu cuenta es permanente y no se puede deshacer. Todas tus publicaciones y comentarios serán eliminados.",
     yourDisplayName: "Tu nombre para mostrar",
@@ -1356,5 +1373,8 @@ export const translations: Record<Language, Record<string, string>> = {
     unauthorized: "No tienes autorización para realizar esta acción.",
     notFound: "No encontrado.",
     sessionExpired: "Tu sesión ha expirado. Por favor, inicia sesión de nuevo.",
+    topPosts: "Mejores publicaciones",
+    mostLiked: "Más gustados",
+    mostCommented: "Más comentados",
   },
 };
